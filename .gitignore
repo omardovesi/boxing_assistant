@@ -1,0 +1,17 @@
+# Videos and data - never commit these
+data/
+*.mp4
+*.mov
+*.avi
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+
+# Secrets
+.env
+.env.*
+
+# Outputs
+outputs/
