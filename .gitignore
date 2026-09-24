@@ -8,6 +8,7 @@ data/
 *.pt
 *.pth
 *.onnx
+*.task
 
 # Secrets
 .env
@@ -15,3 +16,9 @@ data/
 
 # Outputs
 outputs/
+
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
