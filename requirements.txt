@@ -1,0 +1,6 @@
+# Torch is installed separately with a CUDA-specific index URL — see DECISIONS.md 005
+# (this machine needs the cu128 build for its Blackwell/sm_120 GPU).
+opencv-python
+ultralytics
+numpy
+pytest
