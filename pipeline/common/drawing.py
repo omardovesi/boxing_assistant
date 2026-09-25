@@ -1,5 +1,5 @@
-"""Draws a COCO-17 skeleton over a frame, shared across all three pose models
-so their outputs are visually comparable."""
+"""Draws COCO-17 skeletons (and, for fighter selection, numbered track-ID
+boxes) over a frame."""
 import cv2
 import numpy as np
 
@@ -50,7 +50,7 @@ def draw_skeleton(
     h, w = out.shape[:2]
 
     for person_idx, person in enumerate(people):
-        color = _PERSON_COLORS[person_idx % len(_PERSON_COLORS)]
+        color = _person_color(person, person_idx)
         kps = person.keypoints
 
         for i, j in SKELETON_EDGE_INDICES:
@@ -70,3 +70,29 @@ def draw_skeleton(
             cv2.circle(out, pt, 3, color, -1)
 
     return out
+
+
+def draw_id_labels(frame: np.ndarray, people: list[PersonPose]) -> np.ndarray:
+    """Returns a copy of `frame` with each tracked person's bbox and a large
+    track ID number, so the user can choose which fighter to analyze. People
+    without a bbox or track_id are skipped."""
+    out = frame.copy()
+    h, w = out.shape[:2]
+
+    for person_idx, person in enumerate(people):
+        if person.bbox is None or person.track_id is None:
+            continue
+        color = _person_color(person, person_idx)
+        x1, y1, x2, y2 = person.bbox
+        p1, p2 = (int(x1 * w), int(y1 * h)), (int(x2 * w), int(y2 * h))
+        cv2.rectangle(out, p1, p2, color, 2)
+        label_pos = (p1[0] + 4, max(p1[1] - 8, 30))
+        cv2.putText(out, str(person.track_id), label_pos, cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+
+    return out
+
+
+def _person_color(person: PersonPose, person_idx: int) -> tuple[int, int, int]:
+    # Prefer track_id so a person keeps the same color across frames.
+    key = person.track_id if person.track_id is not None else person_idx
+    return _PERSON_COLORS[key % len(_PERSON_COLORS)]

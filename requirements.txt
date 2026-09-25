@@ -2,5 +2,7 @@
 # (this machine needs the cu128 build for its Blackwell/sm_120 GPU).
 opencv-python
 ultralytics
+# Needed by ultralytics' ByteTrack tracker; listed so it isn't silently auto-installed.
+lap
 numpy
 pytest
