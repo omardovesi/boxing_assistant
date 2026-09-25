@@ -8,6 +8,11 @@ from pipeline.models.base import PoseEstimator
 # ByteTrack over BoT-SORT: fixed tripod camera makes camera-motion compensation
 # unnecessary, and ByteTrack keeps low-confidence boxes alive through clinches.
 TRACKER_CONFIG = "bytetrack.yaml"
+# Detections handed to the tracker must go as low as ByteTrack's own
+# track_low_thresh (0.1): its second matching stage uses those weak boxes to keep
+# occluded fighters' tracks alive. Filtering at conf_threshold would drop them.
+# ByteTrack still only starts new tracks at >= new_track_thresh (0.25).
+TRACK_DETECTION_CONF = 0.1
 
 
 class YOLOv8Estimator(PoseEstimator):
@@ -35,7 +40,7 @@ class YOLOv8Estimator(PoseEstimator):
         the same for that person across consecutive track() calls."""
         results = self._model.track(
             frame_bgr,
-            conf=self.conf_threshold,
+            conf=TRACK_DETECTION_CONF,
             device=self._device(),
             tracker=TRACKER_CONFIG,
             persist=True,

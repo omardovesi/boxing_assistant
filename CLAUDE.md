@@ -33,4 +33,8 @@ per-frame keypoints. No web app yet.
   record it in DECISIONS.md.
 
 ## Commands
-(fill in as they're created, e.g. how to run the pipeline and tests)
+- Tests: `.venv\Scripts\python -m pytest tests`
+- Pick a fighter (saves outputs/analyze/<clip>/preview.jpg with numbered people):
+  `.venv\Scripts\python -m pipeline.analyze "data/clip.mp4" --preview`
+- Draw one fighter's skeleton (use the same --start as the preview):
+  `.venv\Scripts\python -m pipeline.analyze "data/clip.mp4" --fighter 1 --duration 10`

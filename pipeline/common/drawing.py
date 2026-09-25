@@ -78,6 +78,9 @@ def draw_id_labels(frame: np.ndarray, people: list[PersonPose]) -> np.ndarray:
     without a bbox or track_id are skipped."""
     out = frame.copy()
     h, w = out.shape[:2]
+    # Scale label size with resolution so IDs stay readable on 720p through 4K.
+    scale = max(h, w) / 1000
+    font_scale, thickness = 1.5 * scale, max(2, int(4 * scale))
 
     for person_idx, person in enumerate(people):
         if person.bbox is None or person.track_id is None:
@@ -85,9 +88,9 @@ def draw_id_labels(frame: np.ndarray, people: list[PersonPose]) -> np.ndarray:
         color = _person_color(person, person_idx)
         x1, y1, x2, y2 = person.bbox
         p1, p2 = (int(x1 * w), int(y1 * h)), (int(x2 * w), int(y2 * h))
-        cv2.rectangle(out, p1, p2, color, 2)
-        label_pos = (p1[0] + 4, max(p1[1] - 8, 30))
-        cv2.putText(out, str(person.track_id), label_pos, cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+        cv2.rectangle(out, p1, p2, color, thickness)
+        label_pos = (p1[0] + thickness, p1[1] + int(45 * scale))  # inside the box, top-left
+        cv2.putText(out, str(person.track_id), label_pos, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
 
     return out
 
