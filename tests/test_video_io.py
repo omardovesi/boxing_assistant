@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import pytest
 
-from pipeline.common.video_io import SegmentWriter, open_segment
+from pipeline.common.video_io import SegmentWriter, VideoStream, open_segment
 
 FPS = 10.0
 WIDTH, HEIGHT = 64, 48
@@ -50,6 +50,32 @@ def test_open_segment_raises_on_missing_file(tmp_path):
 def test_open_segment_raises_when_start_past_end(synthetic_video):
     with pytest.raises(ValueError):
         open_segment(synthetic_video, start=10.0, duration=1.0)
+
+
+def test_stream_metadata_is_available_before_reading(synthetic_video):
+    with VideoStream(synthetic_video, start=0, duration=1.0) as stream:
+        assert stream.fps == pytest.approx(FPS, rel=0.05)
+        assert (stream.width, stream.height) == (WIDTH, HEIGHT)
+        assert stream.frame_count == 10
+
+
+def test_stream_yields_same_frames_as_open_segment(synthetic_video):
+    segment = open_segment(synthetic_video, start=0.5, duration=1.0)
+    with VideoStream(synthetic_video, start=0.5, duration=1.0) as stream:
+        streamed = list(stream)
+    assert len(streamed) == len(segment.frames)
+    assert all(np.array_equal(a, b) for a, b in zip(streamed, segment.frames))
+
+
+def test_stream_without_duration_reads_to_the_end(synthetic_video):
+    with VideoStream(synthetic_video, start=1.0) as stream:
+        assert stream.frame_count == TOTAL_FRAMES - 10
+        assert len(list(stream)) == pytest.approx(TOTAL_FRAMES - 10, abs=1)
+
+
+def test_stream_raises_when_start_past_end(synthetic_video):
+    with pytest.raises(ValueError):
+        VideoStream(synthetic_video, start=10.0)
 
 
 def test_segment_writer_output_is_reopenable(tmp_path):
