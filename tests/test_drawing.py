@@ -39,6 +39,15 @@ def test_handles_multiple_people():
     assert out.shape == FRAME.shape
 
 
+def test_fixed_color_overrides_per_id_colors():
+    red = (0, 0, 255)
+    people = [PersonPose(keypoints=_person(0.9).keypoints, track_id=tid) for tid in (1, 2)]
+    out = draw_skeleton(FRAME, people, color=red)
+    drawn = out[np.any(out != 0, axis=2)]
+    assert len(drawn) > 0
+    assert all(tuple(int(c) for c in px) == red for px in drawn)
+
+
 def test_id_labels_draw_on_a_copy():
     person = PersonPose(bbox=(0.2, 0.2, 0.8, 0.8), track_id=1)
     original = FRAME.copy()

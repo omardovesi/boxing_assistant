@@ -5,13 +5,13 @@ from pipeline.models.base import PoseEstimator
 
 # YOLOv8-pose keypoint order is already COCO-17, so no remapping is needed.
 
-# ByteTrack over BoT-SORT: fixed tripod camera makes camera-motion compensation
-# unnecessary, and ByteTrack keeps low-confidence boxes alive through clinches.
-TRACKER_CONFIG = "bytetrack.yaml"
-# Detections handed to the tracker must go as low as ByteTrack's own
+# BoT-SORT: ByteTrack's matching plus camera-motion compensation (sparse optical
+# flow), so tracks survive handheld/panning footage where ByteTrack lost IDs.
+TRACKER_CONFIG = "botsort.yaml"
+# Detections handed to the tracker must go as low as the tracker's own
 # track_low_thresh (0.1): its second matching stage uses those weak boxes to keep
 # occluded fighters' tracks alive. Filtering at conf_threshold would drop them.
-# ByteTrack still only starts new tracks at >= new_track_thresh (0.25).
+# The tracker still only starts new tracks at >= new_track_thresh (0.25).
 TRACK_DETECTION_CONF = 0.1
 
 

@@ -41,16 +41,18 @@ def draw_skeleton(
     frame: np.ndarray,
     people: list[PersonPose],
     confidence_threshold: float = 0.3,
+    color: tuple[int, int, int] | None = None,
 ) -> np.ndarray:
     """Returns a copy of `frame` with each person's COCO-17 skeleton drawn on
     it. Keypoints/edges below `confidence_threshold` are skipped. Assumes
     keypoint x/y are normalized to [0, 1]; scales to the frame's pixel size.
+    `color` (BGR) draws everyone in that colour instead of one per track ID.
     """
     out = frame.copy()
     h, w = out.shape[:2]
 
     for person_idx, person in enumerate(people):
-        color = _person_color(person, person_idx)
+        person_color = color if color is not None else _person_color(person, person_idx)
         kps = person.keypoints
 
         for i, j in SKELETON_EDGE_INDICES:
@@ -61,13 +63,13 @@ def draw_skeleton(
                 continue
             pt_a = (int(a.x * w), int(a.y * h))
             pt_b = (int(b.x * w), int(b.y * h))
-            cv2.line(out, pt_a, pt_b, color, 2)
+            cv2.line(out, pt_a, pt_b, person_color, 2)
 
         for kp in kps:
             if kp.confidence < confidence_threshold:
                 continue
             pt = (int(kp.x * w), int(kp.y * h))
-            cv2.circle(out, pt, 3, color, -1)
+            cv2.circle(out, pt, 3, person_color, -1)
 
     return out
 
