@@ -16,7 +16,9 @@ from pathlib import Path
 import cv2
 
 from pipeline.common.drawing import draw_id_labels, draw_skeleton
+from pipeline.common.keypoints import COCO17_NAMES
 from pipeline.common.video_io import SegmentWriter, VideoStream, open_segment
+from pipeline.export import frame_record, write_keypoints_json
 from pipeline.models.yolov8_estimator import YOLOv8Estimator
 from pipeline.tracking import FighterFollower, track_ids
 
@@ -40,8 +42,11 @@ def preview(estimator: YOLOv8Estimator, segment, out_dir: Path) -> None:
 
 
 def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, out_dir: Path,
-            conf_threshold: float, relink: bool = True, opponent_id: int | None = None) -> None:
+            conf_threshold: float, relink: bool = True, opponent_id: int | None = None,
+            video_path: Path | None = None, start: float = 0.0) -> None:
     out_path = out_dir / f"fighter_{fighter_id}.mp4"
+    json_path = out_dir / f"fighter_{fighter_id}.json"
+    records: list[dict] = []
     missing = 0
     n = 0
     ids_seen: set[int] = set()
@@ -57,6 +62,7 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
             people = estimator.track(frame)
             ids_seen.update(track_ids(people))
             fighter = follower.update(people, frame)
+            records.append(frame_record(n, start + n / stream.fps, fighter, people))
             if not kit_announced and (follower.kit is not None or follower.kit_failed):
                 kit_announced = True
                 if follower.kit is not None:
@@ -75,7 +81,19 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
                       f"{n / (time.monotonic() - t0):.1f} fps", flush=True)
     elapsed = time.monotonic() - t0
 
+    write_keypoints_json(json_path, {
+        "video": None if video_path is None else video_path.as_posix(),
+        "fps": stream.fps, "width": stream.width, "height": stream.height,
+        "start": start, "frame_count": n,
+        "fighter_id": fighter_id, "opponent_id": follower.opponent_id,
+        "coordinates": "normalized 0-1, origin top-left",
+        "keypoint_names": COCO17_NAMES,
+    }, records)
+
     print(f"done -> {out_path} ({n / elapsed:.1f} fps)")
+    print(f"keypoints -> {json_path}")
+    clinches = sum(1 for r in records if r.get("clinch"))
+    print(f"clinch frames: {clinches}/{n}")
     # A new ID usually means the tracker lost someone and re-found them, so for
     # a two-fighter clip anything above 2 points to ID switches.
     print(f"distinct track IDs seen: {len(ids_seen)} {sorted(ids_seen)}")
@@ -126,7 +144,7 @@ def main() -> None:
         with VideoStream(video_path, args.start, args.duration) as stream:
             print(f"Opened {stream.frame_count} frames at {stream.fps:.1f} fps, {stream.width}x{stream.height}")
             analyze(estimator, stream, args.fighter, out_dir, args.conf_threshold, relink=not args.no_relink,
-                    opponent_id=args.opponent)
+                    opponent_id=args.opponent, video_path=video_path, start=args.start)
 
 
 if __name__ == "__main__":
