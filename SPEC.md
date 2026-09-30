@@ -23,7 +23,9 @@ want objective feedback between sessions.
 
 ## Recording requirements
 The analysis assumes:
-- Single stable camera (tripod), roughly side-on to the fighters
+- Single camera, roughly side-on to the fighters. Tripod is best;
+  handheld with pans is OK (BoT-SORT compensates for camera motion,
+  see DECISIONS.md 006)
 - Both fighters fully in frame most of the time
 - Decent lighting, 720p or higher, 30fps or higher
 - Clips of 1–10 minutes
@@ -85,6 +87,8 @@ Conditioning: how metrics change round by round.
 - Analyzing both fighters at once
 
 ## Open questions
-- Which pose model works best on fast punches? (see DECISIONS.md 005)
-- How to handle tracking ID swaps during clinches?
+- ~~Which pose model works best on fast punches?~~ Resolved:
+  YOLOv8-pose (DECISIONS.md 005)
+- ~~How to handle tracking ID swaps during clinches?~~ Resolved:
+  identify the fighter by kit on top of BoT-SORT (DECISIONS.md 006–007)
 - How to detect round boundaries (manual input vs automatic)?

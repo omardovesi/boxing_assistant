@@ -26,3 +26,4 @@ class Keypoint:
 class PersonPose:
     keypoints: list[Keypoint] = field(default_factory=list)  # len == 17, COCO17 order
     bbox: tuple[float, float, float, float] | None = None  # (x1, y1, x2, y2), optional
+    track_id: int | None = None  # stable across frames when produced by a tracker

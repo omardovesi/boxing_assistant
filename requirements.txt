@@ -1,6 +1,10 @@
-# Torch is installed separately with a CUDA-specific index URL — see DECISIONS.md 005
-# (this machine needs the cu128 build for its Blackwell/sm_120 GPU).
-opencv-python
-ultralytics
-numpy
-pytest
+# Install torch first, separately, with a CUDA-specific index URL (see DECISIONS.md 005):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# This machine needs the cu128 build for its Blackwell/sm_120 GPU.
+# Minimum versions are the ones this pipeline was last tested with.
+opencv-python>=5.0.0
+ultralytics>=8.4.161
+# Needed by ultralytics' BoT-SORT tracker; listed so it isn't silently auto-installed.
+lap>=0.5.13
+numpy>=2.4.6
+pytest>=9.1.1

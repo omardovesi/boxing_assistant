@@ -17,7 +17,8 @@ per-frame keypoints. No web app yet.
 
 ## Stack
 - Python 3.11, virtual environment in .venv
-- Pose model: TBD (see DECISIONS.md)
+- Pose model: YOLOv8-pose (yolov8s-pose, via ultralytics), tracked with
+  BoT-SORT; the fighter is identified by kit (see DECISIONS.md 005–007)
 
 ## How I want you to work
 - I am learning. Explain what you're doing and why, briefly, before
@@ -33,4 +34,11 @@ per-frame keypoints. No web app yet.
   record it in DECISIONS.md.
 
 ## Commands
-(fill in as they're created, e.g. how to run the pipeline and tests)
+- Setup (torch first, cu128 build for this GPU):
+  `.venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cu128`
+  then `.venv\Scripts\python -m pip install -r requirements.txt`
+- Tests: `.venv\Scripts\python -m pytest tests`
+- Pick a fighter (saves outputs/analyze/<clip>/preview.jpg with numbered people):
+  `.venv\Scripts\python -m pipeline.analyze "data/clip.mp4" --preview`
+- Draw one fighter's skeleton (use the same --start as the preview):
+  `.venv\Scripts\python -m pipeline.analyze "data/clip.mp4" --fighter 1 --duration 10`
