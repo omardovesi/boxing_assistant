@@ -245,3 +245,60 @@ def test_follower_with_relink_off_never_takes_a_new_id():
     new = _kitted(7, NEARBY_BOX)
     assert f.update([new, opponent], _scene((new, FIGHTER_KIT), (opponent, OPPONENT_KIT))) is None
     assert f.fighter_id == 1
+
+
+# Clinch: the boxes overlap, so each person's kit crops contain the other's
+# kit. Kit evidence from these frames must not move the follower.
+CLINCH_BOX = (0.43, 0.20, 0.53, 0.80)  # IoU ~0.54 with FIGHTER_BOX
+
+
+# Overlapping bodies (IoU ~0.13) but separate heads, so the headgear crops
+# clearly show a swapped kit: only the overlap should stop the swap.
+BODY_CLINCH_BOX = (0.47, 0.35, 0.57, 0.95)
+
+
+def test_follower_does_not_swap_during_a_clinch():
+    f, _, _ = _calibrated()
+    # Looks exactly like an ID swap, but the two are overlapping.
+    id1, id2 = _kitted(1, FIGHTER_BOX), _kitted(2, BODY_CLINCH_BOX)
+    frame = _scene((id1, OPPONENT_KIT), (id2, FIGHTER_KIT))
+    for _ in range(3 * f.confirm_frames):
+        assert f.update([id1, id2], frame) is id1
+    assert f.swaps == []
+    assert f.fighter_id == 1
+
+
+def test_follower_swap_streak_resumes_after_a_clinch():
+    f, _, _ = _calibrated()
+    id1_apart, id2_apart = _kitted(1, OPPONENT_BOX), _kitted(2, FIGHTER_BOX)
+    apart = _scene((id1_apart, OPPONENT_KIT), (id2_apart, FIGHTER_KIT))
+    id1_clinch, id2_clinch = _kitted(1, FIGHTER_BOX), _kitted(2, CLINCH_BOX)
+    clinch = _scene((id1_clinch, OPPONENT_KIT), (id2_clinch, FIGHTER_KIT))
+    for _ in range(f.confirm_frames - 1):
+        f.update([id1_apart, id2_apart], apart)
+    for _ in range(10):
+        f.update([id1_clinch, id2_clinch], clinch)  # neither adds to nor resets the streak
+    assert f.swaps == []
+    assert f.update([id1_apart, id2_apart], apart) is id2_apart
+    assert f.fighter_id == 2
+
+
+def test_follower_does_not_relink_to_someone_in_a_clinch():
+    f, _, _ = _calibrated()
+    candidate, opponent = _kitted(7, CLINCH_BOX), _kitted(2, FIGHTER_BOX)
+    frame = _scene((opponent, OPPONENT_KIT), (candidate, FIGHTER_KIT))
+    for _ in range(5):
+        assert f.update([candidate, opponent], frame) is None  # fighter's ID gone, candidate overlaps
+    assert f.relinks == []
+    candidate, opponent = _kitted(7, NEARBY_BOX), _kitted(2, OPPONENT_BOX)
+    apart = _scene((candidate, FIGHTER_KIT), (opponent, OPPONENT_KIT))
+    assert f.update([candidate, opponent], apart) is candidate
+    assert f.fighter_id == 7
+
+
+def test_follower_keeps_following_in_a_clinch_even_if_kit_looks_wrong():
+    f, _, _ = _calibrated()
+    followed, opponent = _kitted(1, FIGHTER_BOX), _kitted(2, CLINCH_BOX)
+    frame = _scene((opponent, OPPONENT_KIT), (followed, OPPONENT_KIT))
+    for _ in range(3 * f.confirm_frames):
+        assert f.update([followed, opponent], frame) is followed
