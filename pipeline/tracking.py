@@ -67,6 +67,10 @@ class FighterFollower:
        - the followed person clearly looks like the opponent for
          `confirm_frames` frames and nobody counts as the fighter: report the
          fighter missing rather than draw the skeleton on the wrong person.
+       In a clinch (boxes overlapping) each person's kit crops contain the
+       other's kit, so none of the above happens on those frames: the
+       followed ID is kept, and a lost fighter stays missing until the
+       candidate is apart from everyone.
        Both kit prototypes adapt slowly (lighting, scene cuts), but only from
        frames where the identification is confident.
 
@@ -208,7 +212,11 @@ class FighterFollower:
         fighters = [p for p in plausible
                     if p.track_id != self.fighter_id and self._looks_like_fighter(dists[p.track_id])
                     and (opponent_height is None or _height(p) >= self.min_opponent_height * opponent_height)]
-        best = min(fighters, default=None, key=lambda p: dists[p.track_id][0] - dists[p.track_id][1])
+        by_margin = lambda p: dists[p.track_id][0] - dists[p.track_id][1]
+        best = min(fighters, default=None, key=by_margin)
+        # In a clinch each person's kit crops contain the other's kit, so
+        # overlapping people can't be switched to (see DECISIONS.md).
+        best_clean = min((p for p in fighters if self._is_clean(p, people)), default=None, key=by_margin)
 
         followed = select_fighter(people, self.fighter_id)
         chosen = None
@@ -216,14 +224,17 @@ class FighterFollower:
             followed_dists = dists.get(self.fighter_id)
             if followed_dists is None and followed.track_id not in dists:
                 followed_dists = self.kit.distances(kit_signature(frame, followed))
-            if best is not None and not self._looks_like_fighter(followed_dists):
-                same = self._swap_candidate == best.track_id
-                self._swap_candidate, self._swap_streak = best.track_id, self._swap_streak + 1 if same else 1
-            else:
-                self._swap_candidate, self._swap_streak = None, 0
-            self._doubt_streak = self._doubt_streak + 1 if self._looks_like_opponent(followed_dists) else 0
+            # Overlapping frames neither build nor reset the swap/doubt streaks.
+            overlapping = not self._is_clean(followed, people) or (best is not None and best is not best_clean)
+            if not overlapping:
+                if best is not None and not self._looks_like_fighter(followed_dists):
+                    same = self._swap_candidate == best.track_id
+                    self._swap_candidate, self._swap_streak = best.track_id, self._swap_streak + 1 if same else 1
+                else:
+                    self._swap_candidate, self._swap_streak = None, 0
+                self._doubt_streak = self._doubt_streak + 1 if self._looks_like_opponent(followed_dists) else 0
 
-            if self._swap_streak >= self.confirm_frames:
+            if not overlapping and self._swap_streak >= self.confirm_frames:
                 self.swaps.append((self._frame, self.fighter_id, best.track_id,
                                    None if followed_dists is None else followed_dists[0], dists[best.track_id][0]))
                 self.fighter_id = best.track_id
@@ -231,10 +242,10 @@ class FighterFollower:
                 chosen = best
             elif self._doubt_streak < self.confirm_frames:
                 chosen = followed
-        elif self.relink and best is not None:
-            self.relinks.append((self._frame, self.fighter_id, best.track_id, dists[best.track_id][0]))
-            self.fighter_id = best.track_id
-            chosen = best
+        elif self.relink and best_clean is not None:
+            self.relinks.append((self._frame, self.fighter_id, best_clean.track_id, dists[best_clean.track_id][0]))
+            self.fighter_id = best_clean.track_id
+            chosen = best_clean
 
         self._adapt(chosen, people, plausible, signatures, dists)
         return chosen
