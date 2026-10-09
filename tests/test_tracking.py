@@ -39,7 +39,7 @@ FAR_BOX = (0.90, 0.20, 1.00, 0.80)
 def test_follower_returns_fighter_while_id_present():
     f = FighterFollower(1)
     a = PersonPose(track_id=1, bbox=FIGHTER_BOX)
-    assert f.update([a, PersonPose(track_id=2, bbox=NEARBY_BOX)]) is a
+    assert f.update([a, PersonPose(track_id=2, bbox=FAR_BOX)]) is a
     assert f.relinks == []
 
 
@@ -107,7 +107,8 @@ def test_follower_picks_closest_of_several_new_ids():
     f = FighterFollower(1)
     f.update([PersonPose(track_id=1, bbox=FIGHTER_BOX)])
     closer = PersonPose(track_id=8, bbox=(0.41, 0.20, 0.51, 0.80))
-    assert f.update([PersonPose(track_id=7, bbox=NEARBY_BOX), closer]) is closer
+    further = PersonPose(track_id=7, bbox=(0.52, 0.20, 0.62, 0.80))  # not overlapping `closer` (no clinch)
+    assert f.update([further, closer]) is closer
 
 
 def test_follower_cannot_relink_before_fighter_ever_seen():
@@ -245,3 +246,142 @@ def test_follower_with_relink_off_never_takes_a_new_id():
     new = _kitted(7, NEARBY_BOX)
     assert f.update([new, opponent], _scene((new, FIGHTER_KIT), (opponent, OPPONENT_KIT))) is None
     assert f.fighter_id == 1
+
+
+# Clinches: while the fighter overlaps the opponent by clinch_iou (0.3) or
+# more, nobody is reported; afterwards the fighter is re-identified by kit.
+CLINCH_BOX = (0.43, 0.20, 0.53, 0.80)  # IoU ~0.54 with FIGHTER_BOX
+# Just stepped out of the clinch: next to FIGHTER_BOX, not overlapping, within
+# clinch_partner_dist (0.25 fighter heights between centres).
+APART_BOX = (0.55, 0.20, 0.65, 0.80)
+
+
+def _clinch(f, fighter_id=1, opponent_id=2):
+    a, b = _kitted(fighter_id, FIGHTER_BOX), _kitted(opponent_id, CLINCH_BOX)
+    return f.update([a, b], _scene((a, FIGHTER_KIT), (b, OPPONENT_KIT)))
+
+
+def _apart(f, fighter_id=1, opponent_id=2):
+    """Returns (result, the person wearing the fighter's kit)."""
+    a, b = _kitted(fighter_id, FIGHTER_BOX), _kitted(opponent_id, APART_BOX)
+    return f.update([a, b], _scene((a, FIGHTER_KIT), (b, OPPONENT_KIT))), a
+
+
+def test_clinch_reports_fighter_missing():
+    f, _, _ = _calibrated()
+    assert _clinch(f) is None
+    assert f.in_clinch and f.clinches == 1
+
+
+def test_clinch_ends_after_exit_frames_and_reidentifies_same_id():
+    f, _, _ = _calibrated()
+    _clinch(f)
+    for _ in range(f.clinch_exit_frames - 1):
+        assert _apart(f)[0] is None  # still counted as the clinch
+        assert f.in_clinch
+    result, fighter = _apart(f)
+    assert result is fighter and not f.in_clinch
+    assert [(old, new) for _, old, new, _ in f.reidentified] == [(1, 1)]
+
+
+def test_brief_separation_does_not_end_clinch():
+    f, _, _ = _calibrated()
+    _clinch(f)
+    _apart(f)
+    _clinch(f)
+    assert f.in_clinch and f.clinches == 1
+
+
+def test_after_clinch_follows_fighters_kit_when_tracker_swapped_ids():
+    f, _, _ = _calibrated()
+    _clinch(f)
+    for _ in range(f.clinch_exit_frames - 1):
+        _apart(f, fighter_id=2, opponent_id=1)
+    # Tracker swapped: ID 2 now wears the fighter's kit. No confirm-frames delay.
+    result, fighter = _apart(f, fighter_id=2, opponent_id=1)
+    assert result is fighter and f.fighter_id == 2
+    assert [(old, new) for _, old, new, _ in f.reidentified] == [(1, 2)]
+    assert f.swaps == []
+
+
+def test_after_clinch_missing_until_someone_wears_fighters_kit():
+    f, _, _ = _calibrated()
+    _clinch(f)
+    # Clinch ends (two people seen apart) but neither wears the fighter's kit:
+    # the followed ID is on the opponent, and an unpainted person is unclear.
+    opponent, unclear = _kitted(1, APART_BOX), _kitted(5, FIGHTER_BOX)
+    frame = _scene((opponent, OPPONENT_KIT))
+    for _ in range(f.clinch_exit_frames + 5):
+        assert f.update([opponent, unclear], frame) is None
+    assert not f.in_clinch and f.reidentified == []
+    result, fighter = _apart(f, fighter_id=7, opponent_id=1)
+    assert result is fighter and f.fighter_id == 7
+
+
+def test_clinch_detected_when_fighters_id_lost_inside_it():
+    f, _, _ = _calibrated()
+    _clinch(f)
+    assert _clinch(f, fighter_id=7) is None  # ID 1 gone; 7 and 2 overlap where the fighter was
+    assert f.in_clinch and f.clinches == 1
+    for _ in range(f.clinch_exit_frames - 1):
+        _apart(f, fighter_id=7)
+    result, fighter = _apart(f, fighter_id=7)
+    assert result is fighter
+    assert [(old, new) for _, old, new, _ in f.reidentified] == [(1, 7)]
+
+
+def test_small_bystander_overlapping_is_not_a_clinch():
+    f, _, opponent = _calibrated()
+    fighter = _kitted(1, FIGHTER_BOX)
+    bystander = _kitted(7, (0.42, 0.50, 0.48, 0.70))  # a third of the fighter's height
+    frame = _scene((fighter, FIGHTER_KIT), (opponent, OPPONENT_KIT))
+    assert f.update([fighter, bystander, opponent], frame) is fighter
+    assert not f.in_clinch
+
+
+def test_clinch_before_calibration_resumes_by_track_id():
+    f = FighterFollower(1)
+    a, b = PersonPose(track_id=1, bbox=FIGHTER_BOX), PersonPose(track_id=2, bbox=CLINCH_BOX)
+    assert f.update([a, b]) is None and f.in_clinch
+    apart = [PersonPose(track_id=1, bbox=FIGHTER_BOX), PersonPose(track_id=2, bbox=APART_BOX)]
+    results = [f.update(apart) for _ in range(f.clinch_exit_frames)]
+    assert results[-1] is apart[0] and not f.in_clinch
+    assert f.reidentified == []
+
+
+def test_clinch_continues_while_one_fighter_hidden_behind_the_other():
+    # clinch_clip frame 2584: only one merged box is detected at the fighter's
+    # spot, so there's no overlap to measure. That's not "apart".
+    f, _, _ = _calibrated()
+    _clinch(f)
+    merged = _kitted(2, FIGHTER_BOX)
+    frame = _scene((merged, FIGHTER_KIT))  # would pass as the fighter if re-identified
+    for _ in range(3 * f.clinch_exit_frames):
+        assert f.update([merged], frame) is None
+    assert f.in_clinch and f.reidentified == []
+    for _ in range(f.clinch_exit_frames - 1):
+        assert _apart(f)[0] is None
+    result, fighter = _apart(f)
+    assert result is fighter
+    assert [(old, new) for _, old, new, _ in f.reidentified] == [(1, 1)]
+
+
+def test_clinch_times_out_when_only_one_person_stays():
+    f, _, _ = _calibrated(clinch_timeout=10)
+    _clinch(f)
+    alone = _kitted(1, FIGHTER_BOX)
+    frame = _scene((alone, FIGHTER_KIT))
+    results = [f.update([alone], frame) for _ in range(10)]
+    assert all(r is None for r in results[:-1])
+    assert results[-1] is alone and not f.in_clinch
+
+
+def test_person_far_away_does_not_end_clinch():
+    # e.g. the coach at ringside while one fighter hides the other
+    f, _, _ = _calibrated()
+    _clinch(f)
+    merged, coach = _kitted(1, FIGHTER_BOX), _kitted(9, FAR_BOX)  # coach ~0.83 fighter heights away
+    frame = _scene((merged, FIGHTER_KIT), (coach, OPPONENT_KIT))
+    for _ in range(3 * f.clinch_exit_frames):
+        assert f.update([merged, coach], frame) is None
+    assert f.in_clinch

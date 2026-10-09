@@ -70,6 +70,17 @@ class FighterFollower:
        Both kit prototypes adapt slowly (lighting, scene cuts), but only from
        frames where the identification is confident.
 
+    3. Clinches: while the fighter's box overlaps the nearest similar-size
+       person by `clinch_iou` or more, neither the kit (each crop contains the
+       other's kit) nor the track ID (the tracker can swap them) is reliable,
+       so the fighter is reported missing and `in_clinch` is set. The clinch
+       ends after `clinch_exit_frames` frames where two people are seen within
+       `clinch_partner_dist` of the fighter's spot without overlapping (one person there means one
+       fighter is hidden behind the other, so that doesn't count), or after
+       `clinch_timeout` frames of only one person there. Then the fighter is
+       re-identified by kit alone, with no preference for the ID followed
+       before, and recorded in `reidentified`.
+
     Without frames (colour unavailable) it stays in the calibration behaviour.
     """
 
@@ -90,6 +101,10 @@ class FighterFollower:
         min_opponent_height: float = 0.7,
         confirm_frames: int = 5,
         adapt_alpha: float = 0.05,
+        clinch_iou: float = 0.3,
+        clinch_exit_frames: int = 3,
+        clinch_timeout: int = 30,
+        clinch_partner_dist: float = 0.5,
     ):
         self.fighter_id = fighter_id
         self.aspect = aspect  # frame width / height, since bboxes are normalized per axis
@@ -105,12 +120,25 @@ class FighterFollower:
         self.min_opponent_height = min_opponent_height
         self.confirm_frames = confirm_frames
         self.adapt_alpha = adapt_alpha
+        self.clinch_iou = clinch_iou
+        self.clinch_exit_frames = clinch_exit_frames
+        self.clinch_timeout = clinch_timeout
+        # In reference heights. Tighter than max_dist so a coach at ringside
+        # (~0.7 heights away in clinch_clip) can't count as the second fighter.
+        self.clinch_partner_dist = clinch_partner_dist
         self.kit: KitProfile | None = None
         self.kit_failed = False  # calibration finished but no kit region separates the fighters
         # (frame, old ID, new ID, new person's kit distance to the fighter, or None if not checked)
         self.relinks: list[tuple[int, int, int, float | None]] = []
         # (frame, old ID, new ID, followed person's kit distance or None, new person's kit distance)
         self.swaps: list[tuple[int, int, int, float | None, float]] = []
+        # (frame, ID before the clinch, ID after, new person's kit distance to the fighter)
+        self.reidentified: list[tuple[int, int, int, float]] = []
+        self.in_clinch = False
+        self.clinches = 0
+        self._clear_frames = 0  # frames with both fighters seen apart while in a clinch
+        self._alone_frames = 0  # frames in a row with only one person at the fighter's spot
+        self._reidentify_pending = False
         self._frame = -1
         self._first_seen: dict[int, int] = {}
         self._last_bbox: tuple[float, float, float, float] | None = None
@@ -129,7 +157,22 @@ class FighterFollower:
         for tid in track_ids(people):
             self._first_seen.setdefault(tid, self._frame)
 
-        if self.kit is not None and frame is not None:
+        followed = select_fighter(people, self.fighter_id)
+        if self._update_clinch(people, followed):
+            # Keep noting where the followed ID is, so relinking after the
+            # clinch still looks in the right place.
+            if followed is not None and followed.bbox is not None:
+                self._last_bbox = followed.bbox
+                self._lost_at = None
+            elif self._lost_at is None:
+                self._lost_at = self._frame
+            return None
+
+        if self._reidentify_pending and (self.kit is None or frame is None):
+            self._reidentify_pending = False  # nothing to re-identify with: carry on by track ID
+        if self._reidentify_pending:
+            fighter = self._reidentify(people, frame)
+        elif self.kit is not None and frame is not None:
             fighter = self._identify(people, frame)
         else:
             fighter = select_fighter(people, self.fighter_id)
@@ -145,6 +188,63 @@ class FighterFollower:
         if fighter.bbox is not None and self._is_clean(fighter, people):
             self._heights.append(_height(fighter))
         return fighter
+
+    # --- clinches ----------------------------------------------------------
+
+    def _clinch_overlap(self, people: list[PersonPose], followed: PersonPose | None) -> float:
+        """Overlap of the followed person with the nearest similar-size person;
+        if their ID is missing, the largest overlap between two similar-size
+        people near where the fighter was last seen."""
+        if followed is not None and followed.bbox is not None:
+            opponent = nearest_opponent(people, followed)
+            return 0.0 if opponent is None else bbox_iou(followed.bbox, opponent.bbox)
+        return self._max_pair_iou(self._near_fighter(people))
+
+    def _near_fighter(self, people: list[PersonPose], dist: float | None = None) -> list[PersonPose]:
+        """Similar-size people within `dist` (default `max_dist`) reference
+        heights of where the fighter was last seen."""
+        if self._last_bbox is None:
+            return []
+        dist = self.max_dist if dist is None else dist
+        return [p for p in people if p.track_id is not None and p.bbox is not None
+                and self._similar_size(p.bbox) and self._distance(p.bbox) <= dist]
+
+    @staticmethod
+    def _max_pair_iou(people: list[PersonPose]) -> float:
+        return max((bbox_iou(a.bbox, b.bbox) for i, a in enumerate(people) for b in people[i + 1:]), default=0.0)
+
+    def _update_clinch(self, people: list[PersonPose], followed: PersonPose | None) -> bool:
+        """Update `in_clinch` for this frame and return it."""
+        if self._clinch_overlap(people, followed) >= self.clinch_iou:
+            if not self.in_clinch:
+                self.clinches += 1
+                self._swap_candidate, self._swap_streak, self._doubt_streak = None, 0, 0
+            self.in_clinch, self._clear_frames, self._alone_frames = True, 0, 0
+        elif self.in_clinch:
+            near = self._near_fighter(people, self.clinch_partner_dist)
+            if len(near) >= 2 and self._max_pair_iou(near) < self.clinch_iou:
+                self._clear_frames += 1
+                self._alone_frames = 0
+            else:
+                # One person where two were: one fighter hidden behind the
+                # other, not apart. Doesn't move the exit forward.
+                self._alone_frames += 1
+            if self._clear_frames >= self.clinch_exit_frames or self._alone_frames >= self.clinch_timeout:
+                self.in_clinch = False
+                self._reidentify_pending = True
+        return self.in_clinch
+
+    def _reidentify(self, people: list[PersonPose], frame: np.ndarray) -> PersonPose | None:
+        """After a clinch: follow whoever wears the fighter's kit, whatever
+        their ID. Nobody clearly does -> missing until someone does."""
+        _, _, dists, fighters = self._kit_candidates(people, frame)
+        best = min(fighters, default=None, key=lambda p: dists[p.track_id][0] - dists[p.track_id][1])
+        if best is None:
+            return None
+        self.reidentified.append((self._frame, self.fighter_id, best.track_id, dists[best.track_id][0]))
+        self.fighter_id = best.track_id
+        self._reidentify_pending = False
+        return best
 
     # --- calibration -----------------------------------------------------
 
@@ -197,7 +297,9 @@ class FighterFollower:
     def _looks_like_opponent(self, dists: tuple[float, float] | None) -> bool:
         return dists is not None and dists[0] - dists[1] >= self.margin
 
-    def _identify(self, people: list[PersonPose], frame: np.ndarray) -> PersonPose | None:
+    def _kit_candidates(self, people: list[PersonPose], frame: np.ndarray):
+        """Score each plausible person's kit; return (plausible, signatures,
+        distances, people who count as the fighter)."""
         plausible = [p for p in people if p.track_id is not None and p.bbox is not None
                      and (not self._heights and self._last_bbox is None or self._similar_size(p.bbox))]
         signatures = {p.track_id: kit_signature(frame, p) for p in plausible}
@@ -206,8 +308,13 @@ class FighterFollower:
         opponent_height = max((_height(p) for p in plausible if self._looks_like_opponent(dists[p.track_id])),
                               default=None)
         fighters = [p for p in plausible
-                    if p.track_id != self.fighter_id and self._looks_like_fighter(dists[p.track_id])
+                    if self._looks_like_fighter(dists[p.track_id])
                     and (opponent_height is None or _height(p) >= self.min_opponent_height * opponent_height)]
+        return plausible, signatures, dists, fighters
+
+    def _identify(self, people: list[PersonPose], frame: np.ndarray) -> PersonPose | None:
+        plausible, signatures, dists, fighters = self._kit_candidates(people, frame)
+        fighters = [p for p in fighters if p.track_id != self.fighter_id]
         best = min(fighters, default=None, key=lambda p: dists[p.track_id][0] - dists[p.track_id][1])
 
         followed = select_fighter(people, self.fighter_id)

@@ -82,3 +82,12 @@ def test_written_file_loads_back(tmp_path):
     assert len(data["frames"]) == 10
     assert [f["frame"] for f in data["frames"]] == list(range(10))
     assert [f["found"] for f in data["frames"]] == [i % 2 == 0 for i in range(10)]
+
+
+def test_missing_frame_in_clinch_is_marked():
+    assert frame_record(3, 0.1, None, [], in_clinch=True) == {"frame": 3, "time": 0.1, "found": False,
+                                                                "clinch": True}
+
+
+def test_missing_frame_outside_clinch_has_no_clinch_field():
+    assert "clinch" not in frame_record(3, 0.1, None, [], in_clinch=False)

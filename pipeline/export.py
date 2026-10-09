@@ -32,11 +32,15 @@ def clinch_overlap(fighter: PersonPose, people: list[PersonPose]) -> float:
     return bbox_iou(fighter.bbox, opponent.bbox)
 
 
-def frame_record(frame_idx: int, time: float, fighter: PersonPose | None, people: list[PersonPose]) -> dict:
+def frame_record(frame_idx: int, time: float, fighter: PersonPose | None, people: list[PersonPose],
+                 in_clinch: bool = False) -> dict:
     """One frame's entry. Missing frames keep their entry so frame numbers
-    and times always line up with the video."""
+    and times always line up with the video. A missing frame during a
+    clinch (identity not assigned) is marked `"clinch": true`."""
     record = {"frame": frame_idx, "time": _r(time), "found": fighter is not None}
     if fighter is None:
+        if in_clinch:
+            record["clinch"] = True
         return record
     # Round first so `clinch` always agrees with the stored `overlap`.
     overlap = _r(clinch_overlap(fighter, people))

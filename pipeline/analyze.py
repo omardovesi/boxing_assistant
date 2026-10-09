@@ -48,6 +48,7 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
     json_path = out_dir / f"fighter_{fighter_id}.json"
     records: list[dict] = []
     missing = 0
+    in_clinch = 0  # frames where the fighter's identity isn't assigned
     n = 0
     ids_seen: set[int] = set()
     follower = FighterFollower(fighter_id, aspect=stream.width / stream.height, relink=relink,
@@ -62,7 +63,7 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
             people = estimator.track(frame)
             ids_seen.update(track_ids(people))
             fighter = follower.update(people, frame)
-            records.append(frame_record(n, start + n / stream.fps, fighter, people))
+            records.append(frame_record(n, start + n / stream.fps, fighter, people, follower.in_clinch))
             if not kit_announced and (follower.kit is not None or follower.kit_failed):
                 kit_announced = True
                 if follower.kit is not None:
@@ -70,7 +71,10 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
                 else:
                     print("  warning: no kit item separates the fighters; following by track ID only")
             if fighter is None:
-                missing += 1
+                if follower.in_clinch:
+                    in_clinch += 1
+                else:
+                    missing += 1
                 writer.write(frame)
             else:
                 writer.write(draw_skeleton(frame, [fighter], confidence_threshold=conf_threshold,
@@ -92,8 +96,8 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
 
     print(f"done -> {out_path} ({n / elapsed:.1f} fps)")
     print(f"keypoints -> {json_path}")
-    clinches = sum(1 for r in records if r.get("clinch"))
-    print(f"clinch frames: {clinches}/{n}")
+    print(f"clinches: {follower.clinches}, {in_clinch}/{n} frames ({in_clinch / max(n, 1):.0%}) "
+          f"with the fighter not assigned")
     # A new ID usually means the tracker lost someone and re-found them, so for
     # a two-fighter clip anything above 2 points to ID switches.
     print(f"distinct track IDs seen: {len(ids_seen)} {sorted(ids_seen)}")
@@ -103,11 +107,15 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
     for frame_idx, old, new, kit_dist in follower.relinks:
         kit = "not checked" if kit_dist is None else f"{kit_dist:.2f}"
         print(f"relinked {old} -> {new} at frame {frame_idx} (kit distance {kit})")
+    for frame_idx, old, new, kit_dist in follower.reidentified:
+        change = "tracker swapped IDs" if old != new else "same ID"
+        print(f"after clinch: {old} -> {new} at frame {frame_idx} (kit distance {kit_dist:.2f}, {change})")
     for frame_idx, old, new, old_dist, new_dist in follower.swaps:
         old_kit = "n/a" if old_dist is None else f"{old_dist:.2f}"
         print(f"swap corrected {old} -> {new} at frame {frame_idx} (kit distance {old_kit} -> {new_dist:.2f})")
     if missing:
-        print(f"warning: fighter {fighter_id} not found in {missing}/{n} frames ({missing / n:.0%})")
+        print(f"warning: fighter {fighter_id} not found in {missing}/{n} frames ({missing / n:.0%}), "
+              f"not counting clinches")
 
 
 def main() -> None:
