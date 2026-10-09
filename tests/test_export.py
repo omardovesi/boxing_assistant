@@ -2,6 +2,7 @@ import json
 
 from pipeline.common.keypoints import Keypoint, PersonPose
 from pipeline.export import CLINCH_IOU, clinch_overlap, frame_record, write_keypoints_json
+from pipeline.metrics import frame_weight
 from tests.helpers import body_keypoints
 
 FIGHTER_BOX = (0.40, 0.20, 0.50, 0.80)
@@ -34,8 +35,8 @@ def test_values_are_rounded_to_4_decimals():
     assert r["bbox"] == [0.1111, 0.2222, 0.3333, 0.4444]
 
 
-def test_missing_frame_has_only_frame_time_found():
-    assert frame_record(7, 0.2333, None, []) == {"frame": 7, "time": 0.2333, "found": False}
+def test_missing_frame_has_only_frame_time_found_and_zero_weight():
+    assert frame_record(7, 0.2333, None, []) == {"frame": 7, "time": 0.2333, "found": False, "frame_weight": 0.0}
 
 
 def test_overlap_is_zero_without_opponent():
@@ -86,8 +87,23 @@ def test_written_file_loads_back(tmp_path):
 
 def test_missing_frame_in_clinch_is_marked():
     assert frame_record(3, 0.1, None, [], in_clinch=True) == {"frame": 3, "time": 0.1, "found": False,
-                                                                "clinch": True}
+                                                                "clinch": True, "frame_weight": 0.0}
 
 
 def test_missing_frame_outside_clinch_has_no_clinch_field():
     assert "clinch" not in frame_record(3, 0.1, None, [], in_clinch=False)
+
+
+def test_found_frame_stores_body_confidence_and_weight():
+    fighter = person(1, FIGHTER_BOX)  # body_keypoints: every confidence 0.9, nobody nearby
+    r = frame_record(0, 0.0, fighter, [fighter])
+    assert r["body_confidence"] == 0.9
+    assert r["frame_weight"] == 1.0
+
+
+def test_stored_weight_matches_recomputed_weight():
+    fighter = person(1, FIGHTER_BOX)
+    opponent = person(2, shifted(FIGHTER_BOX, 0.06))  # IoU ~0.25: partial weight
+    r = frame_record(0, 0.0, fighter, [fighter, opponent])
+    assert 0 < r["frame_weight"] < 1
+    assert r["frame_weight"] == round(frame_weight(r), 4)

@@ -4,11 +4,17 @@ without re-running the pose model.
 Coordinates stay normalized 0-1 as the pose model returns them; the file's
 width/height convert them to pixels. Each keypoint is [x, y, confidence] in
 COCO-17 order, with the names listed once at the top of the file.
+
+Each frame also stores `frame_weight` (how much metrics should trust it, see
+pipeline/metrics.py) and the raw inputs it's computed from (`overlap`,
+`body_confidence`, the keypoint confidences), so weights can be recomputed
+with different limits without re-running the video.
 """
 import json
 from pathlib import Path
 
 from pipeline.common.keypoints import PersonPose
+from pipeline.metrics import body_confidence, frame_weight
 from pipeline.tracking import bbox_iou, nearest_opponent
 
 # Box overlap with the opponent at which a frame counts as a clinch. The raw
@@ -41,6 +47,7 @@ def frame_record(frame_idx: int, time: float, fighter: PersonPose | None, people
     if fighter is None:
         if in_clinch:
             record["clinch"] = True
+        record["frame_weight"] = 0.0
         return record
     # Round first so `clinch` always agrees with the stored `overlap`.
     overlap = _r(clinch_overlap(fighter, people))
@@ -51,6 +58,9 @@ def frame_record(frame_idx: int, time: float, fighter: PersonPose | None, people
         "overlap": overlap,
         "clinch": overlap >= CLINCH_IOU,
     })
+    # From the rounded stored values, so recomputing from the file matches.
+    record["body_confidence"] = _r(body_confidence(record["keypoints"]))
+    record["frame_weight"] = _r(frame_weight(record))
     return record
 
 
