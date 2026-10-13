@@ -39,14 +39,17 @@ def clinch_overlap(fighter: PersonPose, people: list[PersonPose]) -> float:
 
 
 def frame_record(frame_idx: int, time: float, fighter: PersonPose | None, people: list[PersonPose],
-                 in_clinch: bool = False) -> dict:
+                 in_clinch: bool = False, clinch_overlap_now: float | None = None) -> dict:
     """One frame's entry. Missing frames keep their entry so frame numbers
     and times always line up with the video. A missing frame during a
-    clinch (identity not assigned) is marked `"clinch": true`."""
+    clinch (identity not assigned) is marked `"clinch": true`, with the
+    overlap the follower measured on it, if given."""
     record = {"frame": frame_idx, "time": _r(time), "found": fighter is not None}
     if fighter is None:
         if in_clinch:
             record["clinch"] = True
+            if clinch_overlap_now is not None:
+                record["overlap"] = _r(clinch_overlap_now)
         record["frame_weight"] = 0.0
         return record
     # Round first so `clinch` always agrees with the stored `overlap`.

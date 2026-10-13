@@ -63,7 +63,8 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
             people = estimator.track(frame)
             ids_seen.update(track_ids(people))
             fighter = follower.update(people, frame)
-            records.append(frame_record(n, start + n / stream.fps, fighter, people, follower.in_clinch))
+            records.append(frame_record(n, start + n / stream.fps, fighter, people, follower.in_clinch,
+                                        follower.clinch_overlap_now))
             if not kit_announced and (follower.kit is not None or follower.kit_failed):
                 kit_announced = True
                 if follower.kit is not None:
@@ -92,12 +93,17 @@ def analyze(estimator: YOLOv8Estimator, stream: VideoStream, fighter_id: int, ou
         "fighter_id": fighter_id, "opponent_id": follower.opponent_id,
         "coordinates": "normalized 0-1, origin top-left",
         "keypoint_names": COCO17_NAMES,
+        # Why each clinch ended; a clinch still open at the end isn't listed.
+        "clinches": follower.clinch_log,
     }, records)
 
     print(f"done -> {out_path} ({n / elapsed:.1f} fps)")
     print(f"keypoints -> {json_path}")
     print(f"clinches: {follower.clinches}, {in_clinch}/{n} frames ({in_clinch / max(n, 1):.0%}) "
           f"with the fighter not assigned")
+    timeouts = sum(1 for c in follower.clinch_log if c["reason"] == "timeout")
+    still_open = " (1 still open at the end)" if follower.in_clinch else ""
+    print(f"clinch endings: {len(follower.clinch_log) - timeouts} by 3-frame test, {timeouts} by timeout{still_open}")
     # A new ID usually means the tracker lost someone and re-found them, so for
     # a two-fighter clip anything above 2 points to ID switches.
     print(f"distinct track IDs seen: {len(ids_seen)} {sorted(ids_seen)}")

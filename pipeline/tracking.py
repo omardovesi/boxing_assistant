@@ -138,6 +138,14 @@ class FighterFollower:
         self.clinches = 0
         self._clear_frames = 0  # frames with both fighters seen apart while in a clinch
         self._alone_frames = 0  # frames in a row with only one person at the fighter's spot
+        # Logging only (no effect on decisions): the overlap measured this
+        # frame, and one entry per finished clinch: start frame, first frame
+        # after it, "apart" (3-frame test) or "timeout", and frames between the
+        # last overlap >= clinch_iou and the end.
+        self.clinch_overlap_now = 0.0
+        self.clinch_log: list[dict] = []
+        self._clinch_start: int | None = None
+        self._last_overlap_frame: int | None = None
         self._reidentify_pending = False
         self._frame = -1
         self._first_seen: dict[int, int] = {}
@@ -215,11 +223,14 @@ class FighterFollower:
 
     def _update_clinch(self, people: list[PersonPose], followed: PersonPose | None) -> bool:
         """Update `in_clinch` for this frame and return it."""
-        if self._clinch_overlap(people, followed) >= self.clinch_iou:
+        self.clinch_overlap_now = self._clinch_overlap(people, followed)
+        if self.clinch_overlap_now >= self.clinch_iou:
             if not self.in_clinch:
                 self.clinches += 1
+                self._clinch_start = self._frame
                 self._swap_candidate, self._swap_streak, self._doubt_streak = None, 0, 0
             self.in_clinch, self._clear_frames, self._alone_frames = True, 0, 0
+            self._last_overlap_frame = self._frame
         elif self.in_clinch:
             near = self._near_fighter(people, self.clinch_partner_dist)
             if len(near) >= 2 and self._max_pair_iou(near) < self.clinch_iou:
@@ -232,6 +243,11 @@ class FighterFollower:
             if self._clear_frames >= self.clinch_exit_frames or self._alone_frames >= self.clinch_timeout:
                 self.in_clinch = False
                 self._reidentify_pending = True
+                self.clinch_log.append({
+                    "start": self._clinch_start, "end": self._frame,
+                    "reason": "apart" if self._clear_frames >= self.clinch_exit_frames else "timeout",
+                    "frames_after_last_overlap": self._frame - self._last_overlap_frame,
+                })
         return self.in_clinch
 
     def _reidentify(self, people: list[PersonPose], frame: np.ndarray) -> PersonPose | None:

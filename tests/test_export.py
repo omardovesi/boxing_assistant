@@ -107,3 +107,12 @@ def test_stored_weight_matches_recomputed_weight():
     r = frame_record(0, 0.0, fighter, [fighter, opponent])
     assert 0 < r["frame_weight"] < 1
     assert r["frame_weight"] == round(frame_weight(r), 4)
+
+
+def test_suspended_clinch_frame_stores_measured_overlap():
+    r = frame_record(3, 0.1, None, [], in_clinch=True, clinch_overlap_now=0.123456)
+    assert r["overlap"] == 0.1235 and r["clinch"] is True and r["frame_weight"] == 0.0
+
+
+def test_not_found_frame_has_no_overlap():
+    assert "overlap" not in frame_record(3, 0.1, None, [], in_clinch=False, clinch_overlap_now=0.2)

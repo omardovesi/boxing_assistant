@@ -385,3 +385,34 @@ def test_person_far_away_does_not_end_clinch():
     for _ in range(3 * f.clinch_exit_frames):
         assert f.update([merged, coach], frame) is None
     assert f.in_clinch
+
+
+def test_clinch_log_records_apart_ending():
+    f, _, _ = _calibrated()
+    start = f._frame + 1
+    _clinch(f)
+    assert f.clinch_overlap_now >= f.clinch_iou
+    for _ in range(f.clinch_exit_frames):
+        _apart(f)
+    assert f.clinch_log == [{"start": start, "end": start + f.clinch_exit_frames,
+                             "reason": "apart", "frames_after_last_overlap": f.clinch_exit_frames}]
+
+
+def test_clinch_log_records_timeout_ending():
+    f, _, _ = _calibrated(clinch_timeout=10)
+    _clinch(f)
+    _clinch(f)  # last overlap on the second frame
+    last_overlap = f._frame
+    alone = _kitted(1, FIGHTER_BOX)
+    for _ in range(10):
+        f.update([alone], _scene((alone, FIGHTER_KIT)))
+    assert f.clinch_overlap_now == 0.0
+    [entry] = f.clinch_log
+    assert entry["reason"] == "timeout"
+    assert entry["frames_after_last_overlap"] == 10 == entry["end"] - last_overlap
+
+
+def test_clinch_log_empty_while_clinch_open():
+    f, _, _ = _calibrated()
+    _clinch(f)
+    assert f.clinch_log == [] and f.in_clinch
