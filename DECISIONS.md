@@ -139,3 +139,104 @@ opponent early on (no calibration → ID-only); brief wrong frames in clinches.
 Also: frames are now streamed (pipeline/common/video_io.py VideoStream), since
 full 1440p clips decoded at once need 40–53 GB RAM; `--duration` defaults to
 the whole video. Skeleton is drawn in one colour (cyan) whatever the track ID.
+
+## 008 — Save the fighter's keypoints to a JSON file
+Date: 2026-09-30
+Status: resolved.
+What: every run of `--fighter N` now writes `fighter_N.json` next to
+`fighter_N.mp4`. It has one entry per video frame, so frame numbers and
+times always match the video. Each entry says whether the fighter was found
+and, if so, their 17 body points (x, y, and how confident the model is),
+their box, the track ID being followed, and how much their box overlaps the
+opponent's.
+Alternatives: only save the annotated video; save pixel coordinates.
+Why: Phase 2 metrics need the numbers, and re-running the pose model every
+time I try a new metric is slow. Coordinates stay as fractions of the frame
+(0–1, as the model gives them) so the file doesn't depend on the video's
+resolution; width and height are saved at the top to turn them into pixels.
+Frames where the fighter is missing are kept (marked `"found": false`)
+rather than dropped, so nothing gets out of step with the video.
+
+## 009 — In a clinch, stop guessing who the fighter is
+Date: 2026-10-09
+Status: resolved.
+Problem: in a clinch the two fighters are tangled together. Two things I
+relied on to tell them apart both break down at once:
+- the tracker often swaps their IDs, and
+- the kit check (007) gets confused, because the crop around each fighter
+  also contains a big chunk of the other fighter's kit.
+So the skeleton kept jumping onto the opponent mid-clinch.
+Chosen: during a clinch, don't draw anyone. The fighter is marked missing
+with `"clinch": true` in the JSON, and when the clinch is over they are
+picked out again by kit alone, ignoring which ID they had before.
+- A clinch starts when the fighter's box overlaps the nearest person of
+  similar size by 0.3 or more. (Overlap here is IoU: the shared area divided
+  by the total area of both boxes. 0 = apart, 1 = the same box.)
+- It ends after 3 frames where two people are seen close to the fighter's
+  spot and not overlapping. If only one person is visible there, that
+  usually means one fighter is hidden behind the other, so it doesn't count
+  as "apart".
+- Safety net: if only one person is visible for 1 second (30 frames), the
+  clinch ends anyway, so a lost partner can't freeze it forever.
+- "Close" means within half the fighter's height, tight enough that a coach
+  standing at ringside doesn't count as the second fighter.
+Alternative tried first (branch `clinch-switch-fix`, not merged): keep
+following, but don't let the kit check switch people while the boxes overlap
+by 0.1 or more. On clinch_clip it removed two wrong switches (frames 2554
+and 2604) but also blocked a correct one at frame 1180, which left the
+skeleton on the opponent for about 60 frames, and it added 156 missing
+frames. Overlap alone couldn't tell the good switches from the bad ones.
+Skipping clinches entirely is simpler and more honest.
+Result on clinch_clip (3908 frames, run of 2026-10-09): the fighter is drawn
+in 61% of frames, held back for a clinch in 33%, and missing for other
+reasons (out of view etc.) in 6%. 49 clinches: 42 ended with the fighters
+seen apart, 7 by the 1-second timeout.
+Trade-off: no skeleton during clinches, so nothing that happens in a clinch
+(short punches, holding) can be measured. Fine for now: the planned metrics
+are about open exchanges. The other three clips haven't been re-run since
+this change.
+Logging (2026-10-13): the JSON now also lists every clinch with its start,
+end, how it ended (`"apart"` or `"timeout"`) and how many frames passed
+after the last real overlap. That changes nothing about the tracking; it's
+there so I can check whether the exit rules end clinches too early or too
+late.
+Note (2026-10-20): PR #4 (clinch-switch-fix, commit 543e715) was merged into
+main by mistake on GitHub; this merge undoes it, keeping docs-update's
+tracking.py and tests. If ID swaps come back in near-clinches, 543e715 is
+where the rule and its four tests live.
+
+## 010 — Give each frame a trust score ("frame weight") for metrics
+Date: 2026-10-09
+Status: resolved (numbers may be tuned once real metrics exist).
+Problem: not every frame is equally reliable. Some are borderline clinches,
+some have a blurry or half-hidden body. Treating them all the same would let
+bad frames drag metrics around, while throwing them away completely is a
+hard cut that hides how much evidence a number really has.
+Chosen: every frame gets a weight from 0 (ignore it) to 1 (fully trust it):
+
+    frame_weight = overlap factor × confidence factor
+
+- Overlap factor: 1 when the boxes overlap by 0.10 or less, sliding down to 0
+  at 0.30 (where a clinch starts anyway).
+- Confidence factor: based on the average confidence of the 12 body points
+  (shoulders down to ankles; face points are left out because headgear makes
+  them unreliable). 0 at 0.30 or below, sliding up to 1 at 0.55 or above.
+  0.55 is roughly what the worst 10% of clean frames score on clinch_clip.
+- No skeleton → weight 0.
+How metrics use it (pipeline/metrics.py):
+- Averages (e.g. guard height) are weighted, so shaky frames count less.
+- Counts (e.g. punches) only use frames with weight 0.5 or more, because a
+  punch either happened or it didn't, and half-counting one makes no sense.
+- Every result also reports "coverage": the total weight divided by the
+  number of frames. A coverage of 0.2 means "this number rests on thin
+  evidence", and the app can say so instead of hiding it.
+All the limits live in pipeline/config.py. The JSON stores the raw overlap
+and confidences, so changing a limit works on old files without re-running
+the video. On clinch_clip: 46% of frames have full weight, 14% are in
+between, 40% are zero (mostly clinches), and 53% are good enough for counts.
+`python -m pipeline.metrics <json> --frame N` shows the breakdown for any
+frame.
+Alternatives: a hard yes/no filter (simpler, but throws away information
+and makes metrics jump when a frame sits right at the cut-off); weighting by
+confidence only (misses borderline clinches where the model is confidently
+wrong).

@@ -28,3 +28,28 @@
   - Results: 104715 5%, clinch 8%, 122938 20%, Trim 26% missing; skeleton stays on the right fighter,
     only brief jumps inside clinches. Outputs in outputs/analyze/.
   - Next: commit, then per-frame keypoints JSON with a clinch flag.
+
+## 2026-09-30
+  - Added the keypoints JSON: one entry per frame next to the annotated video, so metrics can be built
+    without re-running the pose model. -> DECISIONS.md 008.
+  - Tried blocking kit switches while boxes overlap (branch clinch-switch-fix). Fixed two wrong switches
+    on clinch_clip but blocked a correct one at frame 1180 and added 156 missing frames. Not merged.
+  - Takeaway: inside a clinch I can't reliably tell the fighters apart at all, so stop trying.
+
+## 2026-10-06 / 09
+  - Clinches: the fighter's identity is no longer assigned while the boxes overlap (IoU >= 0.3). After
+    the clinch the fighter is picked out again by kit alone. -> DECISIONS.md 009.
+  - Fiddly part was deciding when a clinch is over: one visible person usually means someone is hidden,
+    not that they split. Needed 3 frames of two people seen apart, or a 1 s timeout. Also had to keep the
+    "nearby" range tight so the coach at ringside wasn't counted as the second fighter.
+  - clinch_clip: drawn 61%, held back for clinch 33%, missing otherwise 6%.
+  - Added frame weights (0-1 trust score per frame from overlap x body confidence) plus the helpers every
+    metric will use: weighted averages, event counts, coverage. -> DECISIONS.md 010.
+  - clinch_clip weights: 46% full, 14% partial, 40% zero; 53% usable for counting events.
+
+## 2026-10-13
+  - Logging only: the JSON lists each clinch (start, end, ended "apart" or by "timeout"). clinch_clip:
+    49 clinches, 42 apart, 7 timeout. Tracking output unchanged.
+  - Docs caught up (DECISIONS 008-010, README outputs section).
+  - Next: re-run the other 3 clips with clinch handling, get the branches onto main, then start
+    Phase 2 with guard height.
