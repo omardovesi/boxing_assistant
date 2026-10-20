@@ -90,5 +90,6 @@ Conditioning: how metrics change round by round.
 - ~~Which pose model works best on fast punches?~~ Resolved:
   YOLOv8-pose (DECISIONS.md 005)
 - ~~How to handle tracking ID swaps during clinches?~~ Resolved:
-  identify the fighter by kit on top of BoT-SORT (DECISIONS.md 006–007)
+  identify the fighter by kit on top of BoT-SORT (DECISIONS.md 006–007),
+  and don't assign the fighter at all during a clinch (DECISIONS.md 009)
 - How to detect round boundaries (manual input vs automatic)?

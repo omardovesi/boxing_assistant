@@ -34,6 +34,33 @@ DECISIONS.md 005.
    .venv\Scripts\python -m pipeline.analyze "data/clip.mp4" --fighter 1
    ```
 
+## What you get
+
+Each run writes to `outputs/analyze/<clip>/`:
+
+- **`fighter_N.mp4`**: the video with the fighter's skeleton drawn in cyan.
+  No skeleton means the fighter is out of view, or they're in a clinch. In a
+  clinch the two fighters can't be told apart reliably, so nothing is drawn
+  until they separate (DECISIONS.md 009).
+- **`fighter_N.json`**: the same thing as numbers, one entry per frame:
+  - `found`: whether the fighter's skeleton is there
+  - `keypoints`: 17 body points as `[x, y, confidence]`, with x and y as
+    fractions of the frame (0–1)
+  - `overlap`: how much the fighter's box overlaps the opponent's (0 = apart)
+  - `clinch`: true during a clinch
+  - `frame_weight`: how much a metric should trust this frame, from 0 to 1
+    (DECISIONS.md 010)
+
+  The top of the file has the video's fps and size, the names of the 17
+  points, and a list of every clinch with how it ended.
+
+To see how trustworthy a clip's frames are, and why a given frame got its
+weight:
+
+```
+.venv\Scripts\python -m pipeline.metrics "outputs/analyze/clip/fighter_1.json" --frame 120
+```
+
 ## Tests
 
 ```
