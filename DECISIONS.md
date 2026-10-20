@@ -200,6 +200,10 @@ end, how it ended (`"apart"` or `"timeout"`) and how many frames passed
 after the last real overlap. That changes nothing about the tracking; it's
 there so I can check whether the exit rules end clinches too early or too
 late.
+Note (2026-10-20): PR #4 (clinch-switch-fix, commit 543e715) was merged into
+main by mistake on GitHub; this merge undoes it, keeping docs-update's
+tracking.py and tests. If ID swaps come back in near-clinches, 543e715 is
+where the rule and its four tests live.
 
 ## 010 — Give each frame a trust score ("frame weight") for metrics
 Date: 2026-10-09
