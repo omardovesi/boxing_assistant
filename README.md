@@ -1,8 +1,9 @@
 # Boxing Coach AI
 
 Analyzes sparring footage of one selected fighter and gives offense/defense
-feedback, with progress tracking across sessions. Currently in Phase 1: a
-command-line pipeline that tracks the chosen fighter and draws their skeleton.
+feedback, with progress tracking across sessions. Phase 1 is done: a
+command-line pipeline that tracks the chosen fighter, draws their skeleton and
+saves their keypoints. Now in Phase 2: turning those keypoints into metrics.
 See [SPEC.md](SPEC.md) for the phases and [DECISIONS.md](DECISIONS.md) for why
 things are built the way they are.
 

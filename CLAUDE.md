@@ -5,9 +5,10 @@ offense/defense feedback, with progress tracking across sessions.
 See SPEC.md for features and phases. See DECISIONS.md for past choices.
 
 ## Current phase
-Phase 1: a command-line tool in /pipeline that takes a video, tracks
-one selected fighter, and outputs an annotated video plus a JSON of
-per-frame keypoints. No web app yet.
+Phase 2: first metrics (guard height, punch count) computed from the
+keypoints JSON, with timestamped events and unit tests. Build them on
+the frame-weight helpers in pipeline/metrics.py (DECISIONS.md 010).
+Phase 1 (the pipeline CLI) is done. No web app yet.
 
 ## Structure
 - pipeline/  CV code (Python). Must stay independent of backend/frontend.

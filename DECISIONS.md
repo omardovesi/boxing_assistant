@@ -124,6 +124,24 @@ right fighter; remaining "missing" frames were fighter out of view / camera on
 the floor. Reviewed by me on the full videos: only brief jumps to the opponent
 inside clinches, recovered right after.
 
+Re-run on 2026-10-20 (current main: kit identification plus the clinch
+handling from 009), same clips and fighters:
+
+| Clip | Skeleton drawn | Clinch (held back) | Missing otherwise |
+|---|---|---|---|
+| Recording 104715 | 88% | 10% | 2% |
+| clinch_clip | 61% | 33% | 6% |
+| Recording 122938 | 71% | 10% | 19% |
+| VIDEO-…-Trim | 64% | 11% | 25% |
+
+"Missing otherwise" is the number to compare with the table above. It went
+down a little everywhere because clinch frames are now counted separately.
+The brief jumps to the opponent inside clinches are gone, since nobody is
+drawn during a clinch (009). Checked by eye: 9 frames per clip spread over
+the whole video, all on the right fighter. What's still missing is the same
+as before: the fighter behind the opponent in 122938, and the phone camera
+pointing at the floor in Trim.
+
 Alternatives tried and dropped:
 1. Relink by position/size only: jumped to a bystander (104715, frame 281).
 2. One colour fingerprint + fixed threshold 0.40: fingerprint ignored
