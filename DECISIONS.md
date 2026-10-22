@@ -258,3 +258,57 @@ Alternatives: a hard yes/no filter (simpler, but throws away information
 and makes metrics jump when a frame sits right at the cut-off); weighting by
 confidence only (misses borderline clinches where the model is confidently
 wrong).
+
+## 011 — Guard height: measured from the shoulders, judged two ways
+Date: 2026-10-22
+Status: accepted. The fixed threshold is still to be picked from labelled
+frames (see below).
+What: guard height = how far the wrist is above the shoulder line, in torso
+lengths (mid-shoulders to mid-hips), per hand. Torso lengths make it
+independent of how far the fighter is from the camera.
+Why the shoulders and not the nose/chin: shoulders are found in 99–100% of
+usable frames, the nose only in 77–90%. Up/down also barely changes with
+which way the fighter faces the camera.
+What the data showed first (pipeline/explore.py, all four clips): the wrist
+point sits low inside the glove, so a tight guard with the gloves at the chin
+still reads 0.3–0.7 torso lengths *below* the shoulder line. "Above the
+shoulder line" therefore does not mean "hands up".
+Judged two ways (my call, see the Phase 2 plan):
+1. Against the fighter's own normal stance (median per hand over the clip):
+   "guard drop" events fire when a hand goes clearly below *their* normal.
+   A deliberate low guard (e.g. Philly shell) doesn't fire all round.
+2. Against one fixed standard for everyone: share of time each hand is below
+   it, as a single "exposure" number. The value isn't guessed: I'll label
+   30–40 frames as guard up / guard down across at least 2 clips, including
+   borderline ones, and the threshold is picked from those.
+Noise: the wrist point jitters about ±0.1 frame to frame and sometimes jumps
+for a single frame. Example, 104715 at 64.43 s (frame 1933): the right wrist
+lands below its own elbow for one frame, confidence still 0.88. It is *not* a
+left/right swap (the left wrist didn't move). Fix: a 3-frame median filter.
+Its length is set in seconds in pipeline/config.py (0.1 s = 3 frames at
+30 fps) so it means the same at other frame rates, with a test that a short
+jab survives it.
+Also found: 12–33% of frames in my clips are repeats of the previous frame
+(lower real frame rate than the 30 fps the file says). Anything measuring
+speed uses a short time span, not frame-to-frame differences.
+
+## 012 — Punch detection: several signals, record the camera angle
+Date: 2026-10-22
+Status: accepted; thresholds come later from the data.
+Problem: the fighter is side-on to the camera in only ~25–35% of usable
+frames. A punch thrown towards the camera hardly changes the arm's length on
+screen, so arm extension alone would miss many punches.
+Chosen signals, combined and compared on real punches in step 5:
+- arm extension beyond that hand's own resting extension (handles long
+  guards: an arm held out isn't a punch, a jab from it still is)
+- wrist speed relative to the shoulder (so stepping in isn't a punch)
+- how much the elbow straightens
+- wrist velocity towards the opponent. Needs the opponent's position in
+  every frame, which the JSON doesn't store yet (only the overlap and the
+  opponent's ID): export.py will also write the opponent's box, and the
+  clips get re-run.
+Every punch event also records a facing estimate, shoulder width / torso
+length (roughly: under 0.35 side-on, 0.35–0.6 angled, 0.6+ facing the
+camera), so accuracy can be reported per view in Phase 3.
+Not in Phase 2: special handling for punches thrown straight at the camera.
+They'll be undercounted; Phase 3 measures by how much, per view.
