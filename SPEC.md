@@ -32,7 +32,7 @@ The analysis assumes:
 
 ## Phases
 
-### Phase 1 — CV pipeline CLI (current)
+### Phase 1 — CV pipeline CLI (done 2026-10-20)
 A command-line tool that runs on a local video file.
 
 Done when:
@@ -45,7 +45,7 @@ Done when:
 - It works on at least 3 of my test clips, including one with clinching
 - Known tracking failures are documented in DECISIONS.md
 
-### Phase 2 — First metrics
+### Phase 2 — First metrics (current)
 Done when:
 - Guard height and punch count are computed from keypoints
 - Output JSON includes timestamped events (e.g. "left hand dropped")
