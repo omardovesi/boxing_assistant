@@ -85,6 +85,35 @@ def count_events(event_flags: Sequence[bool], weights: Sequence[float]) -> Metri
     return MetricResult(float(count), _coverage(weights))
 
 
+def filter_frames(fps: float, seconds: float = config.SMOOTH_SECONDS) -> int:
+    """Median filter length in frames for `seconds`: odd, at least 1."""
+    n = max(1, round(seconds * fps))
+    return n if n % 2 else n + 1
+
+
+def median_filter(values: Sequence[float | None], fps: float,
+                  seconds: float = config.SMOOTH_SECONDS) -> list[float | None]:
+    """Running median over `seconds` (config.SMOOTH_SECONDS by default), to
+    remove one-frame keypoint jumps. Missing values (None) stay missing and
+    split the series: a value is only smoothed with neighbours from its own
+    unbroken stretch. Near the end of a stretch the window shrinks evenly on
+    both sides, so the first and last values are kept as they are."""
+    half = filter_frames(fps, seconds) // 2
+    out: list[float | None] = list(values)
+    i = 0
+    while i < len(values):
+        if values[i] is None:
+            i += 1
+            continue
+        start = i
+        while i < len(values) and values[i] is not None:
+            i += 1
+        for j in range(start, i):  # stretch values[start:i] has no gaps
+            h = min(half, j - start, i - 1 - j)
+            out[j] = statistics.median(values[j - h:j + h + 1])
+    return out
+
+
 def weight_summary(frames: list[dict]) -> dict:
     """Shares of frames at weight 0, in between, and at 1, plus how many reach
     the event threshold and the overall coverage."""
