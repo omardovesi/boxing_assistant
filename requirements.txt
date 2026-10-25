@@ -7,4 +7,6 @@ ultralytics>=8.4.161
 # Needed by ultralytics' BoT-SORT tracker; listed so it isn't silently auto-installed.
 lap>=0.5.13
 numpy>=2.4.6
+# Plots for pipeline/explore.py. Already installed by ultralytics; listed since we import it directly.
+matplotlib>=3.11.2
 pytest>=9.1.1

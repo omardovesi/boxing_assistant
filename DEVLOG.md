@@ -53,3 +53,19 @@
   - Docs caught up (DECISIONS 008-010, README outputs section).
   - Next: re-run the other 3 clips with clinch handling, get the branches onto main, then start
     Phase 2 with guard height.
+
+## 2026-10-22
+  - Phase 2 started (plan: baseline per fighter, punches, guard drops "reported both ways").
+  - Step 1: pipeline/explore.py plots guard height (wrist above shoulder line) and arm extension
+    (shoulder->wrist) per hand, in torso lengths, with weight-0 frames grayed out. Ran on all 4 clips.
+  - Typical values on usable frames: guard median -0.2 to -0.5 (wrist *below* the shoulder line),
+    extension median ~0.5, p90 ~0.8.
+  - Checked by eye on 104715 (60-75 s): a tight guard with gloves at the chin still reads -0.3 to -0.7,
+    because the wrist point sits low inside the glove. So "shoulder line" is not "hands up"; a fixed
+    standard needs calibrating, or a different reference (nose is confident in 77-90% of usable frames,
+    shoulders 99-100%).
+  - Noise: about +-0.1 frame to frame, plus 1-2 frame spikes where the wrist point lands in the wrong
+    spot (64.4 s looked like a punch, wasn't). Needs smoothing that ignores single-frame jumps.
+  - Camera angle: fighter is side-on only ~25-35% of usable frames (shoulder width vs torso). Punches
+    thrown toward the camera barely change 2D arm length, so extension alone will miss many punches.
+  - Next: decide guard reference + punch signal, then step 2 (body.py helpers with tests).
