@@ -261,8 +261,7 @@ wrong).
 
 ## 011 — Guard height: measured from the shoulders, judged two ways
 Date: 2026-10-22
-Status: accepted. The fixed threshold is still to be picked from labelled
-frames (see below).
+Status: accepted. Fixed threshold picked 2026-10-25 (see the end).
 What: guard height = how far the wrist is above the shoulder line, in torso
 lengths (mid-shoulders to mid-hips), per hand. Torso lengths make it
 independent of how far the fighter is from the camera.
@@ -291,6 +290,35 @@ jab survives it.
 Also found: 12–33% of frames in my clips are repeats of the previous frame
 (lower real frame rate than the 30 fps the file says). Anything measuring
 speed uses a short time span, not frame-to-frame differences.
+The fixed threshold (2026-10-25): **-0.34 torso lengths** (below = down),
+`GUARD_EXPOSURE_THRESHOLD` in pipeline/config.py.
+- Labels: 40 frames from the labelling kit (20 from 104715 with both fighters,
+  20 from clinch_clip with fighter_1), judged per hand without seeing the
+  values. Of the 80 hands, 63 are usable (42 down, 21 up); 15 are left out
+  as `unsure` or `punch` (a hand mid-punch says nothing about the guard) and
+  2 had no wrist point. Kept in labels/phase2/.
+- Picked by `python -m pipeline.labels guard`, on the smoothed value the
+  metric sees: the midpoint between labelled values with the best *balanced
+  accuracy* (average of the share of downs caught and the share of ups
+  caught), so the 2:1 majority of downs doesn't pull it. On a tie, the
+  midpoint in the widest gap between values wins (my choice).
+- Result: downs 34/42, ups 18/21, balanced accuracy 0.83. 104715: 0.89,
+  clinch_clip: 0.74. Left hand 0.77, right hand 0.88.
+- Cross-clip check: fitted on 104715 alone it comes out at -0.345 and scores
+  0.74 on clinch_clip; fitted on clinch_clip alone it's -0.332 and scores
+  0.82 on 104715. The threshold barely moves, so it looks like a real
+  standard rather than a fit to one clip. clinch_clip is harder: many of its
+  hands sit between -0.35 and -0.25, where up and down overlap.
+- Mistakes checked by eye (all labels confirmed correct, except G034 right,
+  changed to `unsure` because the hand is hidden):
+  - G010 and G021: one hand reads high but is down, the other reads low but
+    is up. Looks like the pose model swapped the wrists in those frames. Not
+    confirmed yet; if it's common, every per-hand metric suffers.
+  - G016 and G022: guard up, but the left wrist reads about -1.0. Not
+    explained yet.
+  - The rest are within about 0.25 of the threshold: borderline frames.
+- Known limit: 63 hands from 3 fighters in 2 clips. Phase 3 re-checks it on
+  more labels.
 
 ## 012 — Punch detection: several signals, record the camera angle
 Date: 2026-10-22
