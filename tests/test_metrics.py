@@ -2,8 +2,8 @@ import pytest
 
 from pipeline import config
 from pipeline.metrics import (
-    body_confidence, body_confidence_spread, confidence_factor, count_events, frame_weight, overlap_factor, ramp,
-    weight_summary, weighted_mean,
+    body_confidence, body_confidence_spread, confidence_factor, count_events, filter_frames, frame_weight,
+    median_filter, overlap_factor, ramp, weight_summary, weighted_mean,
 )
 
 
@@ -121,3 +121,49 @@ def test_body_confidence_spread_uses_only_clean_found_frames():
 
 def test_body_confidence_spread_too_few_frames():
     assert body_confidence_spread([found(), MISSING]) is None
+
+
+def test_filter_frames_is_odd_and_follows_fps():
+    assert filter_frames(30, 0.1) == 3
+    assert filter_frames(60, 0.1) == 7  # 6 frames, rounded up to odd
+    assert filter_frames(10, 0.1) == 1  # one frame: no smoothing
+    assert filter_frames(30, 0.0) == 1
+
+
+def test_median_filter_removes_a_one_frame_jump():
+    # 104715 at 64.43 s: the wrist lands below its own elbow for one frame.
+    assert median_filter([0.47, 0.47, 0.88, 0.48, 0.51], fps=30) == pytest.approx([0.47, 0.47, 0.48, 0.51, 0.51])
+
+
+def test_median_filter_keeps_a_short_jab():
+    # Arm extension through a quick jab at 30 fps: out and back in ~0.3 s,
+    # peak held for a single frame.
+    jab = [0.50, 0.50, 0.62, 0.78, 0.90, 0.95, 0.88, 0.72, 0.58, 0.50, 0.50]
+    smoothed = median_filter(jab, fps=30)
+    assert max(smoothed) >= 0.90  # the peak loses at most a little
+    assert max(smoothed) - smoothed[0] >= 0.35  # still clearly a jab
+    assert smoothed.index(max(smoothed)) in (4, 5)  # and at the same moment
+
+
+def test_median_filter_keeps_a_jab_on_repeated_frames():
+    # Video with repeated frames: each real frame shows up twice.
+    jab = [0.50, 0.50, 0.70, 0.70, 0.95, 0.95, 0.70, 0.70, 0.50, 0.50]
+    assert median_filter(jab, fps=30) == pytest.approx(jab)
+
+
+def test_median_filter_length_is_in_seconds():
+    # The same 1/30 s jump is two frames at 60 fps, and is still removed.
+    values = [0.5] * 4 + [0.9, 0.9] + [0.5] * 4
+    assert median_filter(values, fps=60) == pytest.approx([0.5] * 10)
+
+
+def test_median_filter_does_not_smooth_across_missing_frames():
+    values = [0.1, 0.9, 0.1, None, 0.5, 0.9]
+    out = median_filter(values, fps=30)
+    assert out[1] == pytest.approx(0.1)  # smoothed within its own stretch
+    assert out[3] is None  # missing stays missing
+    assert out[4:] == pytest.approx([0.5, 0.9])  # 2-frame stretch: ends kept as they are
+
+
+def test_median_filter_keeps_first_and_last_values():
+    assert median_filter([0.9, 0.1, 0.1, 0.9], fps=30) == pytest.approx([0.9, 0.1, 0.1, 0.9])

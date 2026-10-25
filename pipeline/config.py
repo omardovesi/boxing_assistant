@@ -1,8 +1,9 @@
-"""Tunable limits for frame weighting (see pipeline/metrics.py and DECISIONS.md).
+"""Tunable limits for metrics (see pipeline/metrics.py, pipeline/body.py and
+DECISIONS.md). Metrics read the keypoints JSON, so changing these takes effect
+on existing files without re-running the video.
 
 A frame's weight says how much a metric should trust it, from 0 (ignore) to 1
-(full trust). Changing these takes effect on existing JSON files too: metrics
-recompute weights from the stored overlap and keypoint confidences.
+(full trust), recomputed from the stored overlap and keypoint confidences.
 """
 
 # Overlap with the opponent's box (IoU): full weight up to FULL, falling
@@ -18,3 +19,12 @@ WEIGHT_CONF_FULL = 0.55
 
 # Event counts (e.g. punches) ignore frames lighter than this.
 MIN_EVENT_WEIGHT = 0.5
+
+# Keypoints less confident than this are treated as missing by the body
+# measurements (pipeline/body.py). Same as the drawing threshold.
+MIN_KEYPOINT_CONF = 0.3
+
+# Median filter length, in seconds (0.1 s = 3 frames at 30 fps). Removes
+# one-frame keypoint jumps (e.g. a wrist landing below its own elbow) while a
+# short jab survives. In seconds so it means the same at any frame rate.
+SMOOTH_SECONDS = 0.1
