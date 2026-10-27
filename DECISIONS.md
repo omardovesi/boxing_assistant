@@ -309,8 +309,10 @@ The fixed threshold (2026-10-25): **-0.34 torso lengths** (below = down),
   0.82 on 104715. The threshold barely moves, so it looks like a real
   standard rather than a fit to one clip. clinch_clip is harder: many of its
   hands sit between -0.35 and -0.25, where up and down overlap.
-- Mistakes checked by eye (all labels confirmed correct, except G034 right,
-  changed to `unsure` because the hand is hidden):
+- G034 right was relabelled from `up` to `unsure` after review: the hand is
+  hidden, so it's genuinely ambiguous. The threshold didn't change (-0.344
+  before and after); balanced accuracy went from 0.81 to 0.83.
+- Mistakes checked by eye (all other labels confirmed correct):
   - G010 and G021: one hand reads high but is down, the other reads low but
     is up. Looks like the pose model swapped the wrists in those frames. Not
     confirmed yet; if it's common, every per-hand metric suffers.
