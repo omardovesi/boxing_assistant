@@ -29,6 +29,13 @@ MIN_KEYPOINT_CONF = 0.3
 # hands in labels/phase2/ (python -m pipeline.labels guard, DECISIONS.md 011).
 GUARD_EXPOSURE_THRESHOLD = -0.34
 
+# Punch signals (pipeline/signals.py, DECISIONS.md 012): wrist speed is the
+# distance moved over SPEED_SPAN, elbow opening the angle gained over
+# OPENING_SPAN. Spans in seconds, not frames, because 12-33% of frames are
+# repeats of the one before.
+SPEED_SPAN_SECONDS = 0.1
+OPENING_SPAN_SECONDS = 0.2
+
 # Median filter length, in seconds (0.1 s = 3 frames at 30 fps). Removes
 # one-frame keypoint jumps (e.g. a wrist landing below its own elbow) while a
 # short jab survives. In seconds so it means the same at any frame rate.

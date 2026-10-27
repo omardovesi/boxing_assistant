@@ -1,7 +1,7 @@
 import pytest
 
 from pipeline import config
-from pipeline.body import arm_extension, facing, guard_height, point, torso_length
+from pipeline.body import arm_extension, elbow_angle, facing, guard_height, point, torso_length, wrist_offset
 from pipeline.common.keypoints import COCO17_NAMES
 from tests.helpers import body_keypoints
 
@@ -93,3 +93,23 @@ def test_measurements_none_when_fighter_missing():
         assert fn(MISSING, 1.0, "left") is None
     assert facing(MISSING, 1.0) is None
     assert torso_length(MISSING, 1.0) is None
+
+
+def test_elbow_angle_straight_and_bent():
+    # left shoulder (0.2, 0.25), elbow (0.15, 0.4): wrist on the same line = straight arm
+    straight = frame(left_wrist=[0.10, 0.55, 0.9])
+    assert elbow_angle(straight, 1.0, "left") == pytest.approx(180.0)
+    bent = frame(left_elbow=[0.2, 0.4, 0.9], left_wrist=[0.35, 0.4, 0.9])
+    assert elbow_angle(bent, 1.0, "left") == pytest.approx(90.0)
+
+
+def test_elbow_angle_none_without_wrist():
+    assert elbow_angle(frame(left_wrist=[0.2, 0.5, 0.0]), 1.0, "left") is None
+
+
+def test_wrist_offset_from_shoulder_in_torso_lengths():
+    # left wrist (0.2, 0.5) is 0.25 below its shoulder; torso 0.3
+    assert wrist_offset(frame(), 1.0, "left") == pytest.approx((0.0, 0.25 / 0.3))
+    # moving the whole body doesn't change it
+    shifted = frame(bbox=(0.1, 0.0, 1.1, 1.0))
+    assert wrist_offset(shifted, 1.0, "left") == pytest.approx((0.0, 0.25 / 0.3))

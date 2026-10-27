@@ -8,6 +8,8 @@ stores x as a fraction of the frame width and y as a fraction of its height;
 A measurement is None when a keypoint it needs is missing or less confident
 than config.MIN_KEYPOINT_CONF, or the fighter wasn't found.
 """
+import math
+
 from pipeline import config
 from pipeline.common.keypoints import COCO17_NAMES
 
@@ -59,6 +61,29 @@ def arm_extension(frame: dict, aspect: float, hand: str) -> float | None:
     if torso is None or shoulder is None or wrist is None:
         return None
     return _dist(shoulder, wrist) / torso
+
+
+def elbow_angle(frame: dict, aspect: float, hand: str) -> float | None:
+    """Angle at the elbow between upper arm and forearm, in degrees on screen:
+    180 = arm straight. A punch thrown towards the camera can look bent."""
+    s, e, w = (point(frame, f"{hand}_{part}", aspect) for part in ("shoulder", "elbow", "wrist"))
+    if s is None or e is None or w is None:
+        return None
+    upper, fore = _dist(e, s), _dist(e, w)
+    if upper == 0 or fore == 0:
+        return None
+    cos = ((s[0] - e[0]) * (w[0] - e[0]) + (s[1] - e[1]) * (w[1] - e[1])) / (upper * fore)
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
+
+
+def wrist_offset(frame: dict, aspect: float, hand: str) -> Point | None:
+    """Wrist position relative to its shoulder, in torso lengths, so moving
+    the whole body (stepping in) doesn't move it."""
+    torso = torso_length(frame, aspect)
+    shoulder, wrist = point(frame, f"{hand}_shoulder", aspect), point(frame, f"{hand}_wrist", aspect)
+    if torso is None or shoulder is None or wrist is None:
+        return None
+    return (wrist[0] - shoulder[0]) / torso, (wrist[1] - shoulder[1]) / torso
 
 
 def facing(frame: dict, aspect: float) -> float | None:
