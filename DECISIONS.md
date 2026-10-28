@@ -380,10 +380,14 @@ Results (2026-10-27/28, `python -m pipeline.labels punch` and `events`):
 - Per window, best single signal: wrist speed, AUC 0.83 (extension 0.74,
   elbow opening 0.68). Side views easiest; extension catches 4/13 back-view
   punches.
-- Speed relative to the fighter's own usual speed (median or 90th
-  percentile): worse (AUC 0.70), and the cross-clip gap doesn't close
-  (7.7 vs 2.9). The busier clinch_clip fighter has a higher usual speed.
-  Dropped.
+- Tried and dropped: wrist speed divided by the fighter's own usual speed
+  (median, or 90th percentile, per hand over trusted frames), to make one
+  threshold fit every fighter. It did worse (AUC 0.70 vs 0.83, catching
+  36/67 instead of 57/67) and the cross-clip gap didn't close (7.7 vs 2.9).
+  Why: "usual speed" mostly measures how busy a fighter is, not how fast
+  their punches are. The clinch_clip fighter moves a lot (median 1.56 torso
+  lengths/s vs about 0.9-1.0 in 104715), so dividing by it shrinks their
+  punches below everyone else's.
 - Speed + extension (both above their thresholds): same punches caught,
   48 -> 41 false windows, no back/front punches lost. Kept.
 - As a detector (pipeline/punches.py, speed > 5.2 torso lengths/s and
@@ -398,3 +402,23 @@ Results (2026-10-27/28, `python -m pipeline.labels punch` and `events`):
 - Back vs front view: nose + eye confidence separates them (median 0.22 on
   back-view punches, 0.82 front, 0.70 side; AUC 0.94 front vs back). Every
   punch event records it as `face_confidence`, next to `facing`.
+Design choices (all limits in pipeline/config.py):
+- Punch = wrist speed above 5.2 torso lengths/s and, within 0.3 s of that
+  fast stretch, arm extension above 0.11 beyond the hand's usual length.
+  Both values are the best-balanced-accuracy fits on all 68 punches.
+- Wrist speed = distance the wrist moves relative to its shoulder over
+  0.1 s; elbow opening = degrees gained over 0.2 s (spans in seconds,
+  because of repeated frames).
+- Fast stretches less than 0.2 s apart are one punch (out and back).
+- Only frames with weight >= 0.5 can be part of a punch (DECISIONS 010).
+- Punch signals use the median filter over frames, not pictures (011
+  update): over pictures it flattens one-picture peaks.
+- Evaluation: every window 1.6 s (whole-second label times); no-punch
+  windows keep 1 s from that fighter's punches; a detection matches a label
+  when its peak is inside the label's window, each used once.
+- By-eye check: a fixed random sample (seed 0) of 20 detections, classified
+  as punch / feint / parry / guard / other, since "is it correct?" alone
+  wouldn't say what the false alarms are.
+- No more tuning in Phase 2. Phase 3 improves accuracy with exact label
+  times (2 decimals), the opponent's box (velocity towards the opponent)
+  and the per-frame repeat flag.
