@@ -46,6 +46,15 @@ PUNCH_EXTENSION = 0.11
 PUNCH_EXTENSION_SECONDS = 0.3
 PUNCH_MERGE_SECONDS = 0.2
 
+# Guard drop (pipeline/guard.py): a hand at least GUARD_DROP_MARGIN torso
+# lengths below that fighter's usual guard height for GUARD_DROP_SECONDS or
+# more, outside that hand's punches and the GUARD_DROP_AFTER_PUNCH seconds
+# after each (the hand is still coming back). The margin is about 3x the
+# frame-to-frame wrist jitter (~0.1).
+GUARD_DROP_MARGIN = 0.3
+GUARD_DROP_SECONDS = 0.3
+GUARD_DROP_AFTER_PUNCH = 0.5
+
 # Median filter length, in seconds (0.1 s = 3 frames at 30 fps). Removes
 # one-frame keypoint jumps (e.g. a wrist landing below its own elbow) while a
 # short jab survives. In seconds so it means the same at any frame rate.
