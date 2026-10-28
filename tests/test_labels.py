@@ -1,6 +1,7 @@
 import pytest
 
-from pipeline.labels import evaluate, load_guard_labels, pick_threshold
+from pipeline.labels import (WINDOW, PunchLabel, auc, evaluate, load_guard_labels, load_punch_labels, parse_time,
+                             match_events, pick_threshold, punch_kind, punch_window, shared_frames)
 
 
 def split(downs: list[float], ups: list[float]):
@@ -51,3 +52,60 @@ def test_load_leaves_out_unsure_and_punch_but_counts_them(tmp_path):
     assert [(l.id, l.frame, l.fighter, l.hand, l.label) for l in labels] == [
         ("G002", 362, "fighter_2", "left", "down"), ("G002", 362, "fighter_2", "right", "up")]
     assert answers == {"punch": 1, "unsure": 1, "down": 1, "up": 1}
+
+
+def test_parse_time():
+    assert parse_time("00:21") == 21.0
+    assert parse_time("1:35.36") == pytest.approx(95.36)
+    assert parse_time("12.5") == 12.5
+
+
+def test_punch_kind_from_notes():
+    assert punch_kind("1") == "1"
+    assert punch_kind("2 to the body") == "2"
+    assert punch_kind("second of 1-2") == "2"
+    assert punch_kind("third of 1-2-1") == "1"
+    assert punch_kind("") is None and punch_kind("feint") is None
+
+
+def test_load_punch_labels_maps_kit_to_fighter_and_skips_unknown(tmp_path):
+    path = tmp_path / "punch_labels.csv"
+    path.write_text("clip,time_s,fighter,hand,view,notes\n"
+                    "Recording 2026-09-24 104715,1:35.36,red headgear,right_hand,side,1\n"
+                    "clinch_clip,00:21,red headgear,left_hand,back,1\n"
+                    "clinch_clip,00:13,White Headgear,left_hand,side,second of 1-2\n", encoding="utf-8")
+    labels, skipped = load_punch_labels(path)
+    assert [(l.fighter, l.hand, l.time, l.exact, l.kind) for l in labels] == [
+        ("fighter_2", "right", pytest.approx(95.36), True, "1"), ("fighter_1", "left", 13.0, False, "2")]
+    assert len(skipped) == 1
+
+
+def test_punch_windows_all_the_same_length():
+    exact = PunchLabel("c", "1:00.50", 60.5, True, "fighter_1", "left", "side", "1")
+    whole = PunchLabel("c", "1:00", 60.0, False, "fighter_1", "left", "side", "1")
+    for lab in (exact, whole):
+        a, b = punch_window(lab)
+        assert b - a == pytest.approx(WINDOW)
+    assert punch_window(exact)[0] < 60.5 < punch_window(exact)[1]
+    assert punch_window(whole)[0] < 60.0 and punch_window(whole)[1] > 61.0  # covers the whole second
+
+
+def test_auc():
+    assert auc([3, 4], [1, 2]) == 1.0
+    assert auc([1], [2]) == 0.0
+    assert auc([2], [2]) == 0.5
+
+
+def test_shared_frames_when_both_follow_one_track():
+    a = {"frames": [{"frame": 0, "found": True, "track_id": 1}, {"frame": 1, "found": True, "track_id": 1}]}
+    b = {"frames": [{"frame": 0, "found": True, "track_id": 2}, {"frame": 1, "found": True, "track_id": 1}]}
+    assert shared_frames({"f1": a, "f2": b}) == {1}
+    assert shared_frames({"f1": a}) == set()
+
+
+def test_match_events_pairs_each_event_once():
+    peaks = [10.1, 10.4, 30.0]
+    windows = [(9.8, 11.4), (9.8, 11.4), (20.0, 21.6)]
+    found, extra = match_events(peaks, windows)
+    assert found == [0, 1, None]  # two punches in one second, one missed
+    assert extra == [2]  # detected, but nobody labelled a punch there

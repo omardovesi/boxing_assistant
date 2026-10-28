@@ -92,12 +92,27 @@ def filter_frames(fps: float, seconds: float = config.SMOOTH_SECONDS) -> int:
 
 
 def median_filter(values: Sequence[float | None], fps: float,
-                  seconds: float = config.SMOOTH_SECONDS) -> list[float | None]:
+                  seconds: float = config.SMOOTH_SECONDS,
+                  repeats: Sequence[bool] | None = None) -> list[float | None]:
     """Running median over `seconds` (config.SMOOTH_SECONDS by default), to
     remove one-frame keypoint jumps. Missing values (None) stay missing and
     split the series: a value is only smoothed with neighbours from its own
     unbroken stretch. Near the end of a stretch the window shrinks evenly on
-    both sides, so the first and last values are kept as they are."""
+    both sides, so the first and last values are kept as they are.
+
+    With `repeats` (True where a frame shows the same picture as the one
+    before, e.g. from pipeline.labelling_kit.repeated_frames) the median runs over distinct
+    pictures instead of frames, so a wrong picture shown twice is removed
+    too (DECISIONS.md 011, G010). It also flattens a peak that lasts one
+    picture, so it suits held positions (guard), not fast punches."""
+    if repeats is not None:
+        keep = [i for i, r in enumerate(repeats) if not r]
+        smoothed = median_filter([values[i] for i in keep], fps, seconds)
+        out, j = [], -1
+        for i, r in enumerate(repeats):
+            j += not r
+            out.append(smoothed[j] if j >= 0 else values[i])
+        return out
     half = filter_frames(fps, seconds) // 2
     out: list[float | None] = list(values)
     i = 0

@@ -79,3 +79,24 @@
   - Checked the wrong frames by eye: labels right (one changed to unsure, hand hidden). G010/G021 look
     like the model swapping the wrists; G016/G022 unexplained. Rest are borderline.
   - Next: compare the punch signals against the punch labels (DECISIONS 012).
+
+## 2026-10-27
+  - Guard misses looked into: no left/right wrist swap behind G010 or G021 (real swaps: 0.1-0.8% of
+    picture-to-picture steps). G010: the right wrist point jumped onto the raised glove for one picture
+    that is shown twice (repeated frame), so the 3-frame median keeps it. G016: fighter_2's JSON
+    follows fighter_1 there (10 frames in 104715). G022: back view and blur, left wrist put at the
+    waist; torso and lean are normal.
+  - Punch signals scored on the 68 labelled punches vs 186 no-punch windows (all windows 1.6 s):
+    wrist speed best (AUC 0.83), arm extension 0.74, elbow opening 0.68. Side view easiest; extension
+    fails on back views. Wrist-speed threshold doesn't carry over between clips yet (clinch_clip has
+    only 12 no-punch windows).
+
+## 2026-10-28
+  - PR #10: corrected the G010/G021 explanation; the shared-track error (104715 3835-3850) is under
+    DECISIONS 007.
+  - Guard filter now runs over distinct pictures (from the kit's pixel cache; keypoint equality misses
+    repeats). Threshold -0.344 -> -0.35, cross-clip fits closer.
+  - Punch variants: speed vs own baseline worse; speed + extension cuts false windows, keeps back/front.
+  - Detector built (pipeline/punches.py). 49/68 found but 25 false alarms per usable minute; no
+    threshold setting fixes it. 20 detections in outputs/check/ to classify by eye.
+  - Face confidence separates back from front views (AUC 0.94).

@@ -167,3 +167,12 @@ def test_median_filter_does_not_smooth_across_missing_frames():
 
 def test_median_filter_keeps_first_and_last_values():
     assert median_filter([0.9, 0.1, 0.1, 0.9], fps=30) == pytest.approx([0.9, 0.1, 0.1, 0.9])
+
+
+def test_median_filter_over_pictures_removes_a_jump_shown_twice():
+    # 104715 frame 2397 (G010): one wrong picture, repeated, survives a frame filter
+    values = [-0.57, -0.57, 0.02, 0.02, -0.29, -0.29, -0.25]
+    repeats = [False, True, False, True, False, True, False]
+    assert median_filter(values, fps=30)[2] == pytest.approx(0.02)
+    assert median_filter(values, fps=30, repeats=repeats) == pytest.approx(
+        [-0.57, -0.57, -0.29, -0.29, -0.25, -0.25, -0.25])
