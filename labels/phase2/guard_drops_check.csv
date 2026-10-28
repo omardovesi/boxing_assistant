@@ -1,0 +1,13 @@
+id,clip,start_s,end_s,fighter,hand,what,notes
+D01,Recording 2026-09-24 104715,4.53,4.83,fighter_1,right,drop,
+D02,Recording 2026-09-24 104715,31.43,31.77,fighter_1,left,drop,hand is lower than usual
+D03,Recording 2026-09-24 104715,52.53,52.83,fighter_2,left,no_drop,
+D04,Recording 2026-09-24 104715,129.33,129.73,fighter_2,left,no_drop,
+D05,Recording 2026-09-24 104715,129.33,129.73,fighter_2,right,no_drop,
+D06,Recording 2026-09-24 104715,140.40,141.13,fighter_2,right,drop,
+D07,Recording 2026-09-24 104715,142.40,142.93,fighter_2,right,drop,
+D08,Recording 2026-09-24 104715,151.77,153.07,fighter_1,right,other,round is over so fighter is walking back to his corner
+D09,clinch_clip,8.27,8.67,fighter_1,left,no_drop,
+D10,clinch_clip,10.93,11.27,fighter_1,right,no_drop,
+
+

@@ -40,7 +40,10 @@ OPENING_SPAN_SECONDS = 0.2
 # PUNCH_SPEED (torso lengths per second) and, within PUNCH_EXTENSION_SECONDS
 # of that, the arm reaches PUNCH_EXTENSION beyond its usual length. Fast
 # stretches closer than PUNCH_MERGE_SECONDS are one punch (out and back).
-# Both thresholds picked from the 68 labelled punches (DECISIONS.md 012).
+# Both thresholds picked per window from the first (whole-second) punch
+# labels. Re-picked on exact times the same way they come out at 4.5 / -0.03,
+# but as a detector that gives 41 false alarms per minute instead of 26 for
+# 9 more punches found, so these stay (DECISIONS.md 012).
 PUNCH_SPEED = 5.2
 PUNCH_EXTENSION = 0.11
 PUNCH_EXTENSION_SECONDS = 0.3

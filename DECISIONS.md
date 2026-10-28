@@ -372,6 +372,26 @@ drop; 2 of 43 labelled `down` do, which is expected, as most `down` labels
 are at that fighter's usual height (the fixed standard catches those).
 By-eye check: 10 random drops in outputs/check/guard_drops_check.csv, next
 to the 20 punch detections.
+By-eye result (2026-10-28, sheet kept in labels/phase2/guard_drops_check.csv,
+each drop judged against that fighter's usual guard): **4 drop, 5 no_drop,
+1 other**.
+- Confirmed: D01, D02 (104715 fighter_1), D06, D07 (104715 fighter_2,
+  140-143 s).
+- Not a drop: D03; D04 and D05 (fighter_2, both hands over the same
+  129.3-129.7 s); D09, D10 (clinch_clip). Both hands "dropping" at once
+  hints at a body-level cause (a crouch, or a wrong torso length) rather
+  than the hands; it's about 1 s after the shared-track stretch (007). Not
+  checked yet.
+- Other: D08, the round is over and the fighter walks back to the corner.
+  The hand really is low, but it isn't sparring.
+- No drop was split into pieces, so gaps are not bridged.
+- Meaning: about 4 in 9 sparring drops are real (only 10 checked, so
+  rough). The drop count is usable as a rough number, but single drops
+  can't be shown as feedback yet.
+- Phase 3: label drops directly (start and end) and tune the margin (0.3)
+  and length (0.3 s) on them; look at drops on both hands at once (torso
+  length, tracking); leave out time between rounds (needs round times,
+  detected or entered by the user).
 
 ## 012 — Punch detection: several signals, record the camera angle
 Date: 2026-10-22
@@ -443,3 +463,81 @@ Design choices (all limits in pipeline/config.py):
 - No more tuning in Phase 2. Phase 3 improves accuracy with exact label
   times (2 decimals), the opponent's box (velocity towards the opponent)
   and the per-frame repeat flag.
+Re-run with exact label times (2026-10-28): all 76 punches re-timed in mpv
+to the frame (mm:ss.mmm); 69 used.
+- Short windows: the arm's longest point lands a median 0.02 s from the
+  labelled time, so the labels are on time. The wrist-speed peak lands a
+  median 0.13 s after (speed looks back 0.1 s, and the return is often fast
+  too); 80% within -0.21..+0.45 s. Windows are now 0.25 s before to 0.35 s
+  after the label (0.6 s, was 1.6 s), and no-punch windows are 0.6 s too.
+  Whole-second times are no longer accepted.
+- Combinations: each punch has its own window and a detection matches at
+  most one label. Of 13 same-hand pairs under 1 s apart, 5 are both found
+  separately; no detection was counted for two punches.
+- Per window: wrist speed AUC 0.85 (was 0.83), extension 0.73, elbow
+  opening 0.71. Speed + extension fitted jointly: speed > 4.53, extension
+  > -0.03; extension only removes 8 of 118 false windows now.
+- Cross-clip: speed fitted on 104715 5.66, on clinch_clip 4.39 (gap was
+  7.9 vs 4.3). clinch_clip now has 71 no-punch windows (was 12).
+- Decision: the detector keeps 5.2 / 0.11. The re-picked 4.53 / -0.03 finds
+  51/69 punches but fires 222 times where no punch is labelled (41 per
+  usable minute); 5.2 / 0.11 finds 42/69 with 143 (26 per minute). Picking
+  per window by balanced accuracy over-rewards the rare punch windows; a
+  detector should be tuned on events (Phase 3). 5.2 / 0.11 is also what the
+  by-eye sample was drawn from.
+By-eye result (2026-10-28, sheet kept in labels/phase2/punch_events_check.csv,
+20 random detections at 5.2 / 0.11): **11 punch, 8 guard, 1 other**, no
+feints or parries.
+- The false alarms are guard adjustments: the hand moving back up,
+  adjusting the guard, moving up and down (E01-E03, E06, E08,
+  E09, E13, E19). These are fast wrist movements near the head, which
+  wrist speed can't tell from a punch, and the arm reaches far enough to
+  pass the extension check. One `other`: E05, a lot of movement, no punch.
+- By hand: left 10 of 13 are punches, right 1 of 7. By fighter: 104715
+  fighter_2 0 of 3 (E08 a back view), 104715 fighter_1 4 of 8, clinch_clip
+  fighter_1 7 of 9.
+- Only 5 of the 11 real punches match a label in punch_labels.csv:
+  E17's label is a whole-second time (1:00.000), which the loader skips;
+  E12 is 0.14 s from a right-hand label in a back view but was detected on
+  the left (a left/right mix-up in the label or the keypoints); E04 is 0.7 s
+  after a right-hand label; E10, E15 and E20 have no label. So the labels
+  miss punches, and "26 false alarms per minute" overstates the problem:
+  about 9 in 20 detections (45%, roughly +/-20 points with 20 checked) are
+  not punches.
+- Meaning: with about 60% of labelled punches found and about 55% of
+  detections real, the punch total is in the right range, but by luck of two
+  errors offsetting; the per-punch events can't be shown as feedback yet,
+  and right-hand counts are unreliable.
+- Phase 3: (1) fix the labels first: add E10, E15, E20, re-time the
+  1:00.000 row, check E12's hand, and look for other missed punches;
+  (2) separate guard adjustments from punches: the wrist moving away from
+  the head and towards the opponent (needs the opponent's box), or a
+  stronger extension condition; (3) tune the detector on events, not
+  windows, with the right hand reported separately.
+
+## 013 — Metrics go in their own file, with coverage on every number
+Date: 2026-10-28
+Status: accepted.
+What: `python -m pipeline.summary fighter_N.json` writes
+`fighter_N_metrics.json` next to the keypoints file: a summary (guard per
+hand: average height, usual height, exposure below -0.35, drop count, height
+per minute; punch counts per hand and per usable minute; clinch count;
+the thresholds used) and every punch and guard-drop event sorted by time.
+Why a separate file: the keypoints JSON stays the raw record of the video.
+Metrics are recomputed in seconds from it whenever a threshold changes,
+without re-running the pose model, and the `settings` block says which
+thresholds produced a file.
+Choices (mine):
+- Each event gets a `time` to sort on: the peak for a punch, the start for a
+  guard drop.
+- Averages and exposure are weighted by frame weight and carry coverage
+  (DECISIONS 010); counts use trusted frames only (weight >= 0.5).
+- Height per minute is per clock minute of the video, so fatigue shows as
+  a trend; minutes with little trusted footage show low coverage.
+- Repeated pictures: the JSON's own per-frame `repeat` flags if present
+  (planned for the next re-run), else `--repeats`, else filter over frames;
+  `guard_filter` says which was used.
+- Frames where two fighters' files follow the same person are not left out
+  here (that's only an issue when two fighters are tracked in one clip).
+Known limit: punch counts inherit the detector's false alarms (012): on
+clinch_clip it reports 78 punches where 32 are labelled.

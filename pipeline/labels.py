@@ -131,7 +131,6 @@ class PunchLabel:
     clip: str
     raw_time: str
     time: float
-    exact: bool  # written with decimals; whole seconds are only good to ~1 s
     fighter: str
     hand: str
     view: str
@@ -139,30 +138,35 @@ class PunchLabel:
 
 
 def load_punch_labels(path: Path) -> tuple[list[PunchLabel], list[dict]]:
-    """Punches whose fighter has a keypoints JSON, plus the rows skipped."""
+    """Punches whose fighter has a keypoints JSON and whose time has decimals,
+    plus the rows skipped (a whole-second time is only good to ~1 s, too
+    coarse for the punch windows)."""
     labels, skipped = [], []
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             fighter = FIGHTER_BY_KIT.get(row["clip"], {}).get(row["fighter"].strip().lower())
-            if fighter is None:
+            raw = row["time_s"].strip()
+            if fighter is None or "." not in raw:
                 skipped.append(row)
                 continue
-            raw = row["time_s"].strip()
-            labels.append(PunchLabel(row["clip"], raw, parse_time(raw), "." in raw, fighter,
+            labels.append(PunchLabel(row["clip"], raw, parse_time(raw), fighter,
                                      row["hand"].strip().lower().removesuffix("_hand"),
                                      row["view"].strip().lower(), punch_kind(row["notes"])))
     return labels, skipped
 
 
-WINDOW = 1.6  # seconds; every window (punch or not) is this long, so none gets more chances to score high
+# Where to look for a labelled punch (labelled at full extension), in seconds
+# around the label. The wrist-speed peak lands a median 0.13 s after the label
+# (speed looks back 0.1 s, and the return is often fast too); 80% fall within
+# -0.21..+0.45 s. Every window, punch or not, is the same length, so none
+# gets more chances to score high.
+WINDOW_BEFORE = 0.25
+WINDOW_AFTER = 0.35
+WINDOW = WINDOW_BEFORE + WINDOW_AFTER
 
 
 def punch_window(label: PunchLabel) -> tuple[float, float]:
-    """WINDOW seconds around the labelled moment to look for the punch. A
-    whole-second time may have been rounded down from anywhere in that second,
-    so its window starts 0.3 s before and runs past the end of that second."""
-    start = label.time - 0.3 if not label.exact else label.time - WINDOW / 2
-    return start, start + WINDOW
+    return label.time - WINDOW_BEFORE, label.time + WINDOW_AFTER
 
 
 def auc(positives: list[float], negatives: list[float]) -> float:
@@ -285,16 +289,74 @@ def _score_above(threshold: float, pos: list[float], neg: list[float]) -> Split:
     return Split(threshold, sum(v > threshold for v in pos), len(pos), sum(v <= threshold for v in neg), len(neg))
 
 
+Pair = tuple[float, float | None]  # (wrist speed, extension) scores of one window
+
+
+def _both_above(ts: float, te: float, pairs: list[Pair]) -> int:
+    return sum(sp > ts and ex is not None and ex > te for sp, ex in pairs)
+
+
+def fit_speed_and_extension(pos: list[Pair], neg: list[Pair], steps: int = 40) -> tuple[float, Split]:
+    """Thresholds for "speed above ts and extension above te": try `steps`
+    extension thresholds (spread over the values seen, plus none at all) and
+    fit the speed threshold for each. Returns te and the best Split (its
+    threshold is ts)."""
+    exts = sorted({ex for _, ex in pos + neg if ex is not None})
+    candidates = [float("-inf")] + [exts[int(k * (len(exts) - 1) / steps)] for k in range(steps)]
+    best = None
+    for te in candidates:
+        gate = lambda pairs: [sp if ex is not None and ex > te else float("-inf") for sp, ex in pairs]
+        s = _fit_above(gate(pos), gate(neg))
+        if best is None or s.balanced_accuracy > best[1].balanced_accuracy + 1e-9:
+            best = (te, s)
+    return best
+
+
+def _combo_section(positives, negatives) -> tuple[float, float]:
+    pos = [(k, (s["wrist_speed"], s["extension"])) for k, s in positives if s["wrist_speed"] is not None]
+    neg = [(k, (s["wrist_speed"], s["extension"])) for k, s in negatives if s["wrist_speed"] is not None]
+    te, best = fit_speed_and_extension([v for _, v in pos], [v for _, v in neg])
+    ts = best.threshold
+    print(f"\n=== wrist_speed + extension: speed > {ts:.2f} and extension > {te:.3f}")
+
+    def line(name, p, n):
+        caught, quiet = _both_above(ts, te, p), len(n) - _both_above(ts, te, n)
+        print(_punch_line(name, Split(ts, caught, len(p), quiet, len(n))))
+    line("all", [v for _, v in pos], [v for _, v in neg])
+    for clip in CLIPS:
+        line(_short(clip), [v for k, v in pos if k[0] == clip], [v for k, v in neg if k[0] == clip])
+    for hand in HANDS:
+        line(f"{hand} hand", [v for k, v in pos if k[2] == hand], [v for k, v in neg if k[2] == hand])
+    for clip, fighters in CLIPS.items():
+        for name in fighters:
+            line(f"{_short(clip)} {name}", [v for k, v in pos if k[:2] == (clip, name)],
+                 [v for k, v in neg if k[:2] == (clip, name)])
+    for view in sorted({k[3].view for k, _ in pos}):
+        line(f"view {view}", [v for k, v in pos if k[3].view == view], [v for _, v in neg])
+    for fit in CLIPS:
+        for test in CLIPS:
+            if test != fit:
+                fte, fs = fit_speed_and_extension([v for k, v in pos if k[0] == fit], [v for k, v in neg if k[0] == fit])
+                p = [v for k, v in pos if k[0] == test]
+                n = [v for k, v in neg if k[0] == test]
+                on = Split(fs.threshold, _both_above(fs.threshold, fte, p), len(p),
+                           len(n) - _both_above(fs.threshold, fte, n), len(n))
+                print(f"  cross-clip: fit {_short(fit)} -> speed {fs.threshold:.2f}, extension {fte:.3f}"
+                      f" (fit {fs.balanced_accuracy:.2f}), on {_short(test)}: {on.balanced_accuracy:.2f}"
+                      f" (caught {on.downs_caught}/{on.downs}, quiet {on.ups_caught}/{on.ups})")
+    return ts, te
+
+
 def punch_report() -> None:
     labels, skipped = load_punch_labels(LABELS / "punch_labels.csv")
-    print(f"Punch labels: {len(labels)} used, {len(skipped)} skipped (fighter has no keypoints JSON: "
-          f"{', '.join(sorted({r['clip'] + ' ' + r['fighter'] for r in skipped}))})")
+    print(f"Punch labels: {len(labels)} used, {len(skipped)} skipped (no keypoints JSON for that fighter, or a"
+          f" whole-second time): {', '.join(sorted({_short(r['clip']) + ' ' + r['fighter'] for r in skipped}))}")
     data = {clip: {name: json.loads(Path(p).read_text(encoding="utf-8")) for name, p in fighters.items()}
             for clip, fighters in CLIPS.items()}
     print("\nConverted times (check these):")
-    for lab in [l for l in labels if not l.exact][:4] + [l for l in labels if l.exact][:4]:
+    for lab in labels[:3] + labels[-3:]:
         fps = next(iter(data[lab.clip].values()))["fps"]
-        print(f"  {_short(lab.clip):<11} {lab.raw_time:>8} -> {lab.time:7.2f} s -> frame {round(lab.time * fps):>5}"
+        print(f"  {_short(lab.clip):<11} {lab.raw_time:>9} -> {lab.time:7.2f} s -> frame {round(lab.time * fps):>5}"
               f"  {lab.fighter} {lab.hand} {lab.view} kind {lab.kind}")
     positives, negatives, unmeasured = [], [], []  # (key, {signal: score}), key = (clip, fighter, hand, label)
     for clip, fighters in data.items():
@@ -355,6 +417,7 @@ def punch_report() -> None:
                     print(f"  cross-clip: fit {_short(fit)} -> {s.threshold:.3f} (fit {s.balanced_accuracy:.2f}),"
                           f" on {_short(test)}: {on.balanced_accuracy:.2f}"
                           f" (caught {on.downs_caught}/{on.downs}, quiet {on.ups_caught}/{on.ups})")
+    _combo_section(positives, negatives)
 
 
 def match_events(peaks: list[float], windows: list[tuple[float, float]]) -> tuple[list[int | None], list[int]]:

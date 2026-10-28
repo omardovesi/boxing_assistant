@@ -103,3 +103,14 @@
   - Guard-drop events (pipeline/guard.py): hand 0.3 below the fighter's own usual guard for 0.3 s,
     not during/0.5 s after that hand's punches. 30 drops, 3-7 per minute; none on a labelled `up` hand.
     10 sampled for the by-eye check (outputs/check/guard_drops_check.csv).
+  - Punch labels re-timed to the frame. Window 0.6 s (-0.25/+0.35 around the label, from where the
+    speed peak lands). Speed AUC 0.85; cross-clip gap 5.7 vs 4.4. Re-picked 4.5 / -0.03 would double
+    false alarms at event level, so the detector keeps 5.2 / 0.11 (42/69 found, 26 false per minute).
+  - Metrics file: pipeline/summary.py writes fighter_N_metrics.json (guard per hand with coverage,
+    exposure, drops, per-minute trend; punch counts; time-sorted events). -> DECISIONS 013.
+  - By-eye check (sheets in labels/phase2/): punches 11 real of 20; the 9 false alarms are 8 guard
+    adjustments and 1 "other". Right hand 1 of 7 real. 6 of the 11 real punches aren't in the punch
+    labels (3 unlabelled, 1 whole-second time, 1 hand mix-up, 1 near another punch), so the labels
+    need a pass before tuning. Guard drops 4 real of 9 (plus one walk back to the corner after the
+    round); 2 false ones are both hands at once. No drops split, so no bridging. -> DECISIONS 011/012.
+  - Phase 2 done: all four "done when" items met (30 events checked). Next: Phase 3 evaluation.

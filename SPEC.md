@@ -45,14 +45,14 @@ Done when:
 - It works on at least 3 of my test clips, including one with clinching
 - Known tracking failures are documented in DECISIONS.md
 
-### Phase 2 — First metrics (current)
+### Phase 2 — First metrics (done 2026-10-28)
 Done when:
 - Guard height and punch count are computed from keypoints
 - Output JSON includes timestamped events (e.g. "left hand dropped")
 - Each metric function has unit tests
 - I've checked at least 20 events against the video by eye
 
-### Phase 3 — Evaluation
+### Phase 3 — Evaluation (current)
 - Hand-label 100–200 punches and guard drops across my clips
 - Report accuracy of each metric in the README
 
