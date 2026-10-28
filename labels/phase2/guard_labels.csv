@@ -1,0 +1,41 @@
+id,clip,time_s,frame,fighter,left_hand,right_hand
+G001,Recording 2026-09-24 104715,3.90,117,fighter_1,punch,unsure
+G002,Recording 2026-09-24 104715,12.07,362,fighter_2,down,down
+G003,Recording 2026-09-24 104715,16.87,506,fighter_1,down,down
+G004,Recording 2026-09-24 104715,32.13,964,fighter_2,up,up
+G005,Recording 2026-09-24 104715,33.67,1010,fighter_1,down,down
+G006,Recording 2026-09-24 104715,45.20,1356,fighter_2,down,down
+G007,Recording 2026-09-24 104715,50.83,1525,fighter_1,up,up
+G008,Recording 2026-09-24 104715,60.20,1806,fighter_2,down,down
+G009,Recording 2026-09-24 104715,72.53,2176,fighter_1,down,punch
+G010,Recording 2026-09-24 104715,79.90,2397,fighter_2,up,down
+G011,Recording 2026-09-24 104715,86.20,2586,fighter_1,down,down
+G012,Recording 2026-09-24 104715,89.63,2689,fighter_2,up,down
+G013,Recording 2026-09-24 104715,100.03,3001,fighter_1,punch,down
+G014,Recording 2026-09-24 104715,108.23,3247,fighter_2,down,down
+G015,Recording 2026-09-24 104715,114.73,3442,fighter_1,down,down
+G016,Recording 2026-09-24 104715,127.87,3836,fighter_2,up,unsure
+G017,Recording 2026-09-24 104715,130.03,3901,fighter_1,down,unsure
+G018,Recording 2026-09-24 104715,142.50,4275,fighter_2,down,down
+G019,Recording 2026-09-24 104715,147.07,4412,fighter_2,down,punch
+G020,Recording 2026-09-24 104715,155.43,4663,fighter_2,down,down
+G021,clinch_clip,4.63,139,fighter_1,down,up
+G022,clinch_clip,7.47,224,fighter_1,up,unsure
+G023,clinch_clip,15.83,475,fighter_1,up,up
+G024,clinch_clip,24.27,728,fighter_1,down,down
+G025,clinch_clip,26.57,797,fighter_1,down,up
+G026,clinch_clip,40.73,1222,fighter_1,up,unsure
+G027,clinch_clip,43.47,1304,fighter_1,up,up
+G028,clinch_clip,50.57,1517,fighter_1,down,unsure
+G029,clinch_clip,58.53,1756,fighter_1,down,up
+G030,clinch_clip,64.00,1920,fighter_1,punch,down
+G031,clinch_clip,69.87,2096,fighter_1,down,unsure
+G032,clinch_clip,73.13,2194,fighter_1,down,unsure
+G033,clinch_clip,82.40,2472,fighter_1,down,down
+G034,clinch_clip,89.03,2671,fighter_1,down,unsure
+G035,clinch_clip,94.23,2827,fighter_1,down,up
+G036,clinch_clip,101.90,3057,fighter_1,down,up
+G037,clinch_clip,104.87,3146,fighter_1,down,down
+G038,clinch_clip,111.70,3351,fighter_1,up,up
+G039,clinch_clip,123.50,3705,fighter_1,punch,up
+G040,clinch_clip,126.60,3798,fighter_1,down,up

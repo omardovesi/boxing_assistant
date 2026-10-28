@@ -154,6 +154,15 @@ Alternatives tried and dropped:
    Worth comparing if kit identification fails, e.g. same-coloured kit.
 Known limits: both fighters in the same kit; the fighter never apart from the
 opponent early on (no calibration → ID-only); brief wrong frames in clinches.
+Note (2026-10-28): both fighters can end up on the same person. In 104715
+(frames 3835–3850), fighter_2 is hidden behind fighter_1, and fighter_2.json
+switches to fighter_1's track (1870) in 3835–3839 and 3846–3850, with
+fighter_2 missing in between. Both files then hold the same skeleton, and
+the overlap is 0 (only one person is visible), so the frames get full
+weight. Found through guard frame G016 (DECISIONS 011). Only matters when
+two fighters are tracked in one clip (the labelling kit, not the app, which
+analyses one fighter). Evaluation code leaves out frames where both files
+follow the same track.
 Also: frames are now streamed (pipeline/common/video_io.py VideoStream), since
 full 1440p clips decoded at once need 40–53 GB RAM; `--duration` defaults to
 the whole video. Skeleton is drawn in one colour (cyan) whatever the track ID.
@@ -261,8 +270,7 @@ wrong).
 
 ## 011 — Guard height: measured from the shoulders, judged two ways
 Date: 2026-10-22
-Status: accepted. The fixed threshold is still to be picked from labelled
-frames (see below).
+Status: accepted. Fixed threshold picked 2026-10-25 (see the end).
 What: guard height = how far the wrist is above the shoulder line, in torso
 lengths (mid-shoulders to mid-hips), per hand. Torso lengths make it
 independent of how far the fighter is from the camera.
@@ -291,6 +299,46 @@ jab survives it.
 Also found: 12–33% of frames in my clips are repeats of the previous frame
 (lower real frame rate than the 30 fps the file says). Anything measuring
 speed uses a short time span, not frame-to-frame differences.
+The fixed threshold (2026-10-25): **-0.34 torso lengths** (below = down),
+`GUARD_EXPOSURE_THRESHOLD` in pipeline/config.py.
+- Labels: 40 frames from the labelling kit (20 from 104715 with both fighters,
+  20 from clinch_clip with fighter_1), judged per hand without seeing the
+  values. Of the 80 hands, 63 are usable (42 down, 21 up); 15 are left out
+  as `unsure` or `punch` (a hand mid-punch says nothing about the guard) and
+  2 had no wrist point. Kept in labels/phase2/.
+- Picked by `python -m pipeline.labels guard`, on the smoothed value the
+  metric sees: the midpoint between labelled values with the best *balanced
+  accuracy* (average of the share of downs caught and the share of ups
+  caught), so the 2:1 majority of downs doesn't pull it. On a tie, the
+  midpoint in the widest gap between values wins (my choice).
+- Result: downs 34/42, ups 18/21, balanced accuracy 0.83. 104715: 0.89,
+  clinch_clip: 0.74. Left hand 0.77, right hand 0.88.
+- Cross-clip check: fitted on 104715 alone it comes out at -0.345 and scores
+  0.74 on clinch_clip; fitted on clinch_clip alone it's -0.332 and scores
+  0.82 on 104715. The threshold barely moves, so it looks like a real
+  standard rather than a fit to one clip. clinch_clip is harder: many of its
+  hands sit between -0.35 and -0.25, where up and down overlap.
+- G034 right was relabelled from `up` to `unsure` after review: the hand is
+  hidden, so it's genuinely ambiguous. The threshold didn't change (-0.344
+  before and after); balanced accuracy went from 0.81 to 0.83.
+- Mistakes checked by eye (all other labels confirmed correct):
+  - G010 and G021: not a left/right wrist swap. Checked 2026-10-27: real
+    swaps (trading the two wrist points fits the previous picture much
+    better than keeping them) happen in only 0.1-0.8% of picture-to-picture
+    steps, and none within 10 frames of either. G010: the right wrist point
+    jumps onto the raised glove for one picture (-0.57 -> +0.02 and back),
+    and that picture is repeated (frames 2397-2398), so the 3-frame median
+    filter keeps it. G021: inconclusive; back view, right after 3 frames
+    without the fighter, right wrist only 45% confident.
+  - G016: tracking error, not a measurement one. fighter_2.json follows
+    fighter_1 there (see DECISIONS 007, note of 2026-10-28).
+  - G022: torso 18% shorter than the clip's typical one and lean normal
+    (8°), so neither explains it: rescaled it still reads about -0.88. It's a
+    blurred back view and the model put the left wrist at the waist with 82%
+    confidence.
+  - The rest are within about 0.25 of the threshold: borderline frames.
+- Known limit: 63 hands from 3 fighters in 2 clips. Phase 3 re-checks it on
+  more labels.
 
 ## 012 — Punch detection: several signals, record the camera angle
 Date: 2026-10-22

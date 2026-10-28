@@ -69,3 +69,13 @@
   - Camera angle: fighter is side-on only ~25-35% of usable frames (shoulder width vs torso). Punches
     thrown toward the camera barely change 2D arm length, so extension alone will miss many punches.
   - Next: decide guard reference + punch signal, then step 2 (body.py helpers with tests).
+
+## 2026-10-25
+  - Labelled the kit: 40 guard frames (per hand up/down/unsure, plus "punch" for a hand mid-punch) and
+    every punch in both clips (43). Copied to labels/phase2/ so they're in git.
+  - pipeline/labels.py picks the fixed guard threshold from the labels: -0.34 torso lengths, balanced
+    accuracy 0.83 (104715 0.89, clinch_clip 0.74). Fitted on either clip alone it lands at -0.33/-0.35,
+    so it holds across clips. -> DECISIONS.md 011.
+  - Checked the wrong frames by eye: labels right (one changed to unsure, hand hidden). G010/G021 look
+    like the model swapping the wrists; G016/G022 unexplained. Rest are borderline.
+  - Next: compare the punch signals against the punch labels (DECISIONS 012).
