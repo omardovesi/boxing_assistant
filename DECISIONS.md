@@ -154,6 +154,15 @@ Alternatives tried and dropped:
    Worth comparing if kit identification fails, e.g. same-coloured kit.
 Known limits: both fighters in the same kit; the fighter never apart from the
 opponent early on (no calibration → ID-only); brief wrong frames in clinches.
+Note (2026-10-28): both fighters can end up on the same person. In 104715
+(frames 3835–3850), fighter_2 is hidden behind fighter_1, and fighter_2.json
+switches to fighter_1's track (1870) in 3835–3839 and 3846–3850, with
+fighter_2 missing in between. Both files then hold the same skeleton, and
+the overlap is 0 (only one person is visible), so the frames get full
+weight. Found through guard frame G016 (DECISIONS 011). Only matters when
+two fighters are tracked in one clip (the labelling kit, not the app, which
+analyses one fighter). Evaluation code leaves out frames where both files
+follow the same track.
 Also: frames are now streamed (pipeline/common/video_io.py VideoStream), since
 full 1440p clips decoded at once need 40–53 GB RAM; `--duration` defaults to
 the whole video. Skeleton is drawn in one colour (cyan) whatever the track ID.
@@ -313,11 +322,20 @@ The fixed threshold (2026-10-25): **-0.34 torso lengths** (below = down),
   hidden, so it's genuinely ambiguous. The threshold didn't change (-0.344
   before and after); balanced accuracy went from 0.81 to 0.83.
 - Mistakes checked by eye (all other labels confirmed correct):
-  - G010 and G021: one hand reads high but is down, the other reads low but
-    is up. Looks like the pose model swapped the wrists in those frames. Not
-    confirmed yet; if it's common, every per-hand metric suffers.
-  - G016 and G022: guard up, but the left wrist reads about -1.0. Not
-    explained yet.
+  - G010 and G021: not a left/right wrist swap. Checked 2026-10-27: real
+    swaps (trading the two wrist points fits the previous picture much
+    better than keeping them) happen in only 0.1-0.8% of picture-to-picture
+    steps, and none within 10 frames of either. G010: the right wrist point
+    jumps onto the raised glove for one picture (-0.57 -> +0.02 and back),
+    and that picture is repeated (frames 2397-2398), so the 3-frame median
+    filter keeps it. G021: inconclusive; back view, right after 3 frames
+    without the fighter, right wrist only 45% confident.
+  - G016: tracking error, not a measurement one. fighter_2.json follows
+    fighter_1 there (see DECISIONS 007, note of 2026-10-28).
+  - G022: torso 18% shorter than the clip's typical one and lean normal
+    (8°), so neither explains it: rescaled it still reads about -0.88. It's a
+    blurred back view and the model put the left wrist at the waist with 82%
+    confidence.
   - The rest are within about 0.25 of the threshold: borderline frames.
 - Known limit: 63 hands from 3 fighters in 2 clips. Phase 3 re-checks it on
   more labels.
