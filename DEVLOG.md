@@ -103,3 +103,6 @@
   - Guard-drop events (pipeline/guard.py): hand 0.3 below the fighter's own usual guard for 0.3 s,
     not during/0.5 s after that hand's punches. 30 drops, 3-7 per minute; none on a labelled `up` hand.
     10 sampled for the by-eye check (outputs/check/guard_drops_check.csv).
+  - Punch labels re-timed to the frame. Window 0.6 s (-0.25/+0.35 around the label, from where the
+    speed peak lands). Speed AUC 0.85; cross-clip gap 5.7 vs 4.4. Re-picked 4.5 / -0.03 would double
+    false alarms at event level, so the detector keeps 5.2 / 0.11 (42/69 found, 26 false per minute).

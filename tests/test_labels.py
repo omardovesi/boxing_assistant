@@ -1,7 +1,8 @@
 import pytest
 
 from pipeline.labels import (WINDOW, PunchLabel, auc, evaluate, load_guard_labels, load_punch_labels, parse_time,
-                             match_events, pick_threshold, punch_kind, punch_window, shared_frames)
+                             fit_speed_and_extension, match_events, pick_threshold, punch_kind, punch_window,
+                             shared_frames)
 
 
 def split(downs: list[float], ups: list[float]):
@@ -71,23 +72,30 @@ def test_punch_kind_from_notes():
 def test_load_punch_labels_maps_kit_to_fighter_and_skips_unknown(tmp_path):
     path = tmp_path / "punch_labels.csv"
     path.write_text("clip,time_s,fighter,hand,view,notes\n"
-                    "Recording 2026-09-24 104715,1:35.36,red headgear,right_hand,side,1\n"
-                    "clinch_clip,00:21,red headgear,left_hand,back,1\n"
-                    "clinch_clip,00:13,White Headgear,left_hand,side,second of 1-2\n", encoding="utf-8")
+                    "Recording 2026-09-24 104715,1:35.367,red headgear,right_hand,side,1\n"
+                    "clinch_clip,00:21.467,red headgear,left_hand,back,1\n"
+                    "clinch_clip,00:13.967,White Headgear,left_hand,side,second of 1-2\n"
+                    "clinch_clip,00:15,white headgear,left_hand,side,1\n", encoding="utf-8")
     labels, skipped = load_punch_labels(path)
-    assert [(l.fighter, l.hand, l.time, l.exact, l.kind) for l in labels] == [
-        ("fighter_2", "right", pytest.approx(95.36), True, "1"), ("fighter_1", "left", 13.0, False, "2")]
-    assert len(skipped) == 1
+    assert [(l.fighter, l.hand, l.time, l.kind) for l in labels] == [
+        ("fighter_2", "right", pytest.approx(95.367), "1"), ("fighter_1", "left", pytest.approx(13.967), "2")]
+    assert len(skipped) == 2  # no keypoints JSON for that fighter; whole-second time
 
 
-def test_punch_windows_all_the_same_length():
-    exact = PunchLabel("c", "1:00.50", 60.5, True, "fighter_1", "left", "side", "1")
-    whole = PunchLabel("c", "1:00", 60.0, False, "fighter_1", "left", "side", "1")
-    for lab in (exact, whole):
-        a, b = punch_window(lab)
-        assert b - a == pytest.approx(WINDOW)
-    assert punch_window(exact)[0] < 60.5 < punch_window(exact)[1]
-    assert punch_window(whole)[0] < 60.0 and punch_window(whole)[1] > 61.0  # covers the whole second
+def test_punch_window_is_short_and_reaches_past_the_label():
+    lab = PunchLabel("c", "1:00.500", 60.5, "fighter_1", "left", "side", "1")
+    a, b = punch_window(lab)
+    assert b - a == pytest.approx(WINDOW) and WINDOW <= 0.6
+    assert a < 60.5 < b and b - 60.5 > 60.5 - a  # the speed peak tends to come after full extension
+
+
+def test_fit_speed_and_extension_uses_extension_to_drop_false_alarms():
+    # punches: fast and reaching; no-punch windows: some fast but not reaching, some slow
+    pos = [(8.0, 0.4), (7.0, 0.3), (6.0, 0.5)]
+    neg = [(9.0, -0.2), (8.5, -0.3), (2.0, 0.4), (1.0, None)]
+    te, s = fit_speed_and_extension(pos, neg)
+    assert -0.2 <= te < 0.3
+    assert (s.downs_caught, s.ups_caught) == (3, 4)
 
 
 def test_auc():

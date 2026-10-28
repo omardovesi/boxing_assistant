@@ -443,3 +443,25 @@ Design choices (all limits in pipeline/config.py):
 - No more tuning in Phase 2. Phase 3 improves accuracy with exact label
   times (2 decimals), the opponent's box (velocity towards the opponent)
   and the per-frame repeat flag.
+Re-run with exact label times (2026-10-28): all 76 punches re-timed in mpv
+to the frame (mm:ss.mmm); 69 used.
+- Short windows: the arm's longest point lands a median 0.02 s from the
+  labelled time, so the labels are on time. The wrist-speed peak lands a
+  median 0.13 s after (speed looks back 0.1 s, and the return is often fast
+  too); 80% within -0.21..+0.45 s. Windows are now 0.25 s before to 0.35 s
+  after the label (0.6 s, was 1.6 s), and no-punch windows are 0.6 s too.
+  Whole-second times are no longer accepted.
+- Combinations: each punch has its own window and a detection matches at
+  most one label. Of 13 same-hand pairs under 1 s apart, 5 are both found
+  separately; no detection was counted for two punches.
+- Per window: wrist speed AUC 0.85 (was 0.83), extension 0.73, elbow
+  opening 0.71. Speed + extension fitted jointly: speed > 4.53, extension
+  > -0.03; extension only removes 8 of 118 false windows now.
+- Cross-clip: speed fitted on 104715 5.66, on clinch_clip 4.39 (gap was
+  7.9 vs 4.3). clinch_clip now has 71 no-punch windows (was 12).
+- Decision: the detector keeps 5.2 / 0.11. The re-picked 4.53 / -0.03 finds
+  51/69 punches but fires 222 times where no punch is labelled (41 per
+  usable minute); 5.2 / 0.11 finds 42/69 with 143 (26 per minute). Picking
+  per window by balanced accuracy over-rewards the rare punch windows; a
+  detector should be tuned on events (Phase 3). 5.2 / 0.11 is also what the
+  by-eye sample was drawn from.
