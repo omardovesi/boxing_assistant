@@ -12,14 +12,16 @@ so they're kept in git.
 import argparse
 import csv
 import json
+import random
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 from pipeline import config
 from pipeline.body import HANDS, guard_height
-from pipeline.labelling_kit import CLIPS
+from pipeline.labelling_kit import CLIPS, OUT
 from pipeline.metrics import frame_weight, median_filter
+from pipeline.punches import detect_punches
 from pipeline.signals import SIGNALS
 
 LABELS = Path("labels/phase2")
@@ -176,12 +178,18 @@ def _short(clip: str) -> str:
     return clip.split()[-1]
 
 
-def smoothed_guard(json_path: str) -> dict[str, list[float | None]]:
-    """Guard height per hand for every frame, after the median filter (the
-    value the metric will see)."""
+def repeats_for(clip: str) -> list[bool]:
+    """Frames showing the same picture as the one before, as found by the
+    labelling kit from the video's pixels (the JSON doesn't store this yet)."""
+    return json.loads((OUT / "cache" / f"{_short(clip)}_repeats.json").read_text(encoding="utf-8"))
+
+
+def smoothed_guard(json_path: str, repeats: list[bool]) -> dict[str, list[float | None]]:
+    """Guard height per hand for every frame, after the median filter over
+    distinct pictures (the value the metric will see)."""
     data = json.loads(Path(json_path).read_text(encoding="utf-8"))
     aspect = data["width"] / data["height"]
-    return {hand: median_filter([guard_height(f, aspect, hand) for f in data["frames"]], data["fps"])
+    return {hand: median_filter([guard_height(f, aspect, hand) for f in data["frames"]], data["fps"], repeats=repeats)
             for hand in HANDS}
 
 
@@ -193,7 +201,7 @@ def _line(name: str, s: Split) -> str:
 def guard_report() -> None:
     labels, answers = load_guard_labels(LABELS / "guard_labels.csv")
     print("Answers per hand:", ", ".join(f"{a} {n}" for a, n in answers.most_common()))
-    series = {(clip, name): smoothed_guard(path) for clip, fighters in CLIPS.items() for name, path in fighters.items()}
+    series = {(clip, name): smoothed_guard(path, repeats_for(clip)) for clip, fighters in CLIPS.items() for name, path in fighters.items()}
 
     rows, no_value = [], []
     for lab in labels:
@@ -347,11 +355,77 @@ def punch_report() -> None:
                           f" (caught {on.downs_caught}/{on.downs}, quiet {on.ups_caught}/{on.ups})")
 
 
+def match_events(peaks: list[float], windows: list[tuple[float, float]]) -> tuple[list[int | None], list[int]]:
+    """Pair detected punches (peak times) with labelled ones (time windows),
+    each used at most once, earliest first. Returns, per label, the index of
+    its event (None = missed), and the indexes of events matching no label."""
+    used: set[int] = set()
+    found: list[int | None] = []
+    for a, b in windows:
+        hit = next((i for i, t in sorted(enumerate(peaks), key=lambda e: e[1]) if a <= t <= b and i not in used), None)
+        if hit is not None:
+            used.add(hit)
+        found.append(hit)
+    return found, [i for i in range(len(peaks)) if i not in used]
+
+
+CHECK = Path("outputs/check")
+CHECK_EVENTS = 20
+
+
+def events_report() -> None:
+    labels, _ = load_punch_labels(LABELS / "punch_labels.csv")
+    rows, results, minutes = [], [], 0.0
+    for clip, fighters in CLIPS.items():
+        data = {name: json.loads(Path(p).read_text(encoding="utf-8")) for name, p in fighters.items()}
+        shared = shared_frames(data)
+        for name, d in data.items():
+            frames, fps, aspect = d["frames"], d["fps"], d["width"] / d["height"]
+            usable = [frame_weight(f) >= config.MIN_EVENT_WEIGHT and f["frame"] not in shared for f in frames]
+            minutes += sum(usable) / fps / 60
+            for hand in HANDS:
+                events = detect_punches(frames, aspect, fps, hand, usable)
+                mine = [l for l in labels if (l.clip, l.fighter, l.hand) == (clip, name, hand)]
+                found, extra = match_events([e["peak"] for e in events], [punch_window(l) for l in mine])
+                results += [(clip, name, hand, l, f is not None) for l, f in zip(mine, found)]
+                for i, e in enumerate(events):
+                    rows.append({"clip": clip, "fighter": name, **e, "matches_label": i not in extra})
+    caught = sum(r[4] for r in results)
+    false = [r for r in rows if not r["matches_label"]]
+    print(f"Detected {len(rows)} punches; {caught}/{len(results)} labelled punches found; "
+          f"{len(false)} detections match no label ({len(false) / minutes:.1f} per minute of usable footage)")
+
+    def part(name, keep):
+        sub = [r for r in results if keep(r)]
+        print(f"  {name:<24} found {sum(r[4] for r in sub)}/{len(sub)}")
+    for clip in CLIPS:
+        part(_short(clip), lambda r, c=clip: r[0] == c)
+        print(f"  {'':<24} no-label detections {sum(1 for r in false if r['clip'] == clip)}")
+    for hand in HANDS:
+        part(f"{hand} hand", lambda r, h=hand: r[2] == h)
+    for view in ("side", "front", "back"):
+        part(f"view {view}", lambda r, v=view: r[3].view == v)
+
+    rng = random.Random(0)  # same sample every run
+    sample = sorted(rng.sample(rows, min(CHECK_EVENTS, len(rows))), key=lambda r: (r["clip"], r["peak"]))
+    CHECK.mkdir(parents=True, exist_ok=True)
+    path = CHECK / "punch_events_check.csv"
+    if path.exists():
+        print(f"\n{path} already exists; not overwritten")
+        return
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["id", "clip", "time_s", "frame", "fighter", "hand", "what", "notes"])
+        for k, r in enumerate(sample, 1):
+            w.writerow([f"E{k:02d}", r["clip"], f"{r['peak']:.2f}", r["peak_frame"], r["fighter"], r["hand"], "", ""])
+    print(f"\nWrote {len(sample)} events to {path} for the by-eye check")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("what", choices=["guard", "punch"])
+    parser.add_argument("what", choices=["guard", "punch", "events"])
     args = parser.parse_args()
-    guard_report() if args.what == "guard" else punch_report()
+    {"guard": guard_report, "punch": punch_report, "events": events_report}[args.what]()
 
 
 if __name__ == "__main__":

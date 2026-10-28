@@ -90,3 +90,13 @@
     wrist speed best (AUC 0.83), arm extension 0.74, elbow opening 0.68. Side view easiest; extension
     fails on back views. Wrist-speed threshold doesn't carry over between clips yet (clinch_clip has
     only 12 no-punch windows).
+
+## 2026-10-28
+  - PR #10: corrected the G010/G021 explanation; the shared-track error (104715 3835-3850) is under
+    DECISIONS 007.
+  - Guard filter now runs over distinct pictures (from the kit's pixel cache; keypoint equality misses
+    repeats). Threshold -0.344 -> -0.35, cross-clip fits closer.
+  - Punch variants: speed vs own baseline worse; speed + extension cuts false windows, keeps back/front.
+  - Detector built (pipeline/punches.py). 49/68 found but 25 false alarms per usable minute; no
+    threshold setting fixes it. 20 detections in outputs/check/ to classify by eye.
+  - Face confidence separates back from front views (AUC 0.94).

@@ -27,7 +27,7 @@ MIN_KEYPOINT_CONF = 0.3
 # Fixed guard standard, in torso lengths above the shoulder line: a hand below
 # it counts as down for the "exposure" number. Picked from 63 hand-labelled
 # hands in labels/phase2/ (python -m pipeline.labels guard, DECISIONS.md 011).
-GUARD_EXPOSURE_THRESHOLD = -0.34
+GUARD_EXPOSURE_THRESHOLD = -0.35
 
 # Punch signals (pipeline/signals.py, DECISIONS.md 012): wrist speed is the
 # distance moved over SPEED_SPAN, elbow opening the angle gained over
@@ -35,6 +35,16 @@ GUARD_EXPOSURE_THRESHOLD = -0.34
 # repeats of the one before.
 SPEED_SPAN_SECONDS = 0.1
 OPENING_SPAN_SECONDS = 0.2
+
+# Punch detector (pipeline/punches.py): the wrist moves faster than
+# PUNCH_SPEED (torso lengths per second) and, within PUNCH_EXTENSION_SECONDS
+# of that, the arm reaches PUNCH_EXTENSION beyond its usual length. Fast
+# stretches closer than PUNCH_MERGE_SECONDS are one punch (out and back).
+# Both thresholds picked from the 68 labelled punches (DECISIONS.md 012).
+PUNCH_SPEED = 5.2
+PUNCH_EXTENSION = 0.11
+PUNCH_EXTENSION_SECONDS = 0.3
+PUNCH_MERGE_SECONDS = 0.2
 
 # Median filter length, in seconds (0.1 s = 3 frames at 30 fps). Removes
 # one-frame keypoint jumps (e.g. a wrist landing below its own elbow) while a

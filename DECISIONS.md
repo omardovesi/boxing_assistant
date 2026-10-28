@@ -339,6 +339,18 @@ The fixed threshold (2026-10-25): **-0.34 torso lengths** (below = down),
   - The rest are within about 0.25 of the threshold: borderline frames.
 - Known limit: 63 hands from 3 fighters in 2 clips. Phase 3 re-checks it on
   more labels.
+Update (2026-10-28): guard height is now median-filtered over distinct
+pictures, not frames, so a wrong picture shown twice (G010) is removed too.
+Repeated pictures come from the video's pixels (the labelling kit's cache);
+the keypoints of a repeat aren't exactly equal (compression noise up to
+0.001), so they can't be used to find them. The threshold moved from -0.344
+to -0.350 (now **-0.35**), balanced accuracy 0.83 -> 0.82; cross-clip fits
+-0.350 / -0.343 (closer than before), the clinch_clip fit scores 0.87 on
+104715 (was 0.82). G010 right: +0.02 -> -0.29. Punch signals keep the
+per-frame filter: over pictures it flattens a peak lasting one picture and
+lost 2 of 14 front-view punches.
+To do at the next re-run: export.py writes a per-frame `repeat` flag (with
+the opponent's box, 012), so the app doesn't need the labelling kit's cache.
 
 ## 012 — Punch detection: several signals, record the camera angle
 Date: 2026-10-22
@@ -360,3 +372,29 @@ length (roughly: under 0.35 side-on, 0.35–0.6 angled, 0.6+ facing the
 camera), so accuracy can be reported per view in Phase 3.
 Not in Phase 2: special handling for punches thrown straight at the camera.
 They'll be undercounted; Phase 3 measures by how much, per view.
+Results (2026-10-27/28, `python -m pipeline.labels punch` and `events`):
+- Labels: every punch in both clips, 75 rows; 68 used (7 by clinch_clip's
+  red-headgear fighter, who has no keypoints JSON). 60 of the 75 times are
+  whole seconds, so every window (punch or no punch) is 1.6 s long.
+  No-punch windows keep 1 s from any punch by that fighter.
+- Per window, best single signal: wrist speed, AUC 0.83 (extension 0.74,
+  elbow opening 0.68). Side views easiest; extension catches 4/13 back-view
+  punches.
+- Speed relative to the fighter's own usual speed (median or 90th
+  percentile): worse (AUC 0.70), and the cross-clip gap doesn't close
+  (7.7 vs 2.9). The busier clinch_clip fighter has a higher usual speed.
+  Dropped.
+- Speed + extension (both above their thresholds): same punches caught,
+  48 -> 41 false windows, no back/front punches lost. Kept.
+- As a detector (pipeline/punches.py, speed > 5.2 torso lengths/s and
+  extension > 0.11 within 0.3 s, stretches < 0.2 s apart merged): finds
+  49/68 labelled punches but fires 136 more times (25 per usable minute per
+  fighter). Higher thresholds trade recall for false alarms (8.0 / 0.11:
+  25/68 found, 5 per minute); no setting is good. What the extra detections
+  are (unlabelled punches, feints, parries, guard resets) is the by-eye
+  check's job: outputs/check/punch_events_check.csv, 20 random detections.
+- Cross-clip: thresholds don't carry over well (speed fitted on 104715:
+  7.9, on clinch_clip: 4.3). clinch_clip has only 12 no-punch windows.
+- Back vs front view: nose + eye confidence separates them (median 0.22 on
+  back-view punches, 0.82 front, 0.70 side; AUC 0.94 front vs back). Every
+  punch event records it as `face_confidence`, next to `facing`.

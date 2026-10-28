@@ -1,7 +1,7 @@
 import pytest
 
 from pipeline.labels import (WINDOW, PunchLabel, auc, evaluate, load_guard_labels, load_punch_labels, parse_time,
-                             pick_threshold, punch_kind, punch_window, shared_frames)
+                             match_events, pick_threshold, punch_kind, punch_window, shared_frames)
 
 
 def split(downs: list[float], ups: list[float]):
@@ -101,3 +101,11 @@ def test_shared_frames_when_both_follow_one_track():
     b = {"frames": [{"frame": 0, "found": True, "track_id": 2}, {"frame": 1, "found": True, "track_id": 1}]}
     assert shared_frames({"f1": a, "f2": b}) == {1}
     assert shared_frames({"f1": a}) == set()
+
+
+def test_match_events_pairs_each_event_once():
+    peaks = [10.1, 10.4, 30.0]
+    windows = [(9.8, 11.4), (9.8, 11.4), (20.0, 21.6)]
+    found, extra = match_events(peaks, windows)
+    assert found == [0, 1, None]  # two punches in one second, one missed
+    assert extra == [2]  # detected, but nobody labelled a punch there
