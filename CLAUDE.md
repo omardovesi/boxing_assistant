@@ -5,10 +5,12 @@ offense/defense feedback, with progress tracking across sessions.
 See SPEC.md for features and phases. See DECISIONS.md for past choices.
 
 ## Current phase
-Phase 2: first metrics (guard height, punch count) computed from the
-keypoints JSON, with timestamped events and unit tests. Build them on
-the frame-weight helpers in pipeline/metrics.py (DECISIONS.md 010).
-Phase 1 (the pipeline CLI) is done. No web app yet.
+Phase 3: evaluation. Hand-label more punches and guard drops, tune the
+detectors on events, and report each metric's accuracy in the README.
+The known weaknesses and Phase 3 to-dos are at the end of DECISIONS.md
+011 (guard drops) and 012 (punches).
+Phase 1 (the pipeline CLI) and Phase 2 (metrics, `pipeline.summary`) are
+done. No web app yet.
 
 ## Structure
 - pipeline/  CV code (Python). Must stay independent of backend/frontend.

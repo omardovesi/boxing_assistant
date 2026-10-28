@@ -108,3 +108,9 @@
     false alarms at event level, so the detector keeps 5.2 / 0.11 (42/69 found, 26 false per minute).
   - Metrics file: pipeline/summary.py writes fighter_N_metrics.json (guard per hand with coverage,
     exposure, drops, per-minute trend; punch counts; time-sorted events). -> DECISIONS 013.
+  - By-eye check (sheets in labels/phase2/): punches 11 real of 20; the 9 false alarms are 8 guard
+    adjustments and 1 "other". Right hand 1 of 7 real. 6 of the 11 real punches aren't in the punch
+    labels (3 unlabelled, 1 whole-second time, 1 hand mix-up, 1 near another punch), so the labels
+    need a pass before tuning. Guard drops 4 real of 9 (plus one walk back to the corner after the
+    round); 2 false ones are both hands at once. No drops split, so no bridging. -> DECISIONS 011/012.
+  - Phase 2 done: all four "done when" items met (30 events checked). Next: Phase 3 evaluation.

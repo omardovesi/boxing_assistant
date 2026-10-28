@@ -372,6 +372,26 @@ drop; 2 of 43 labelled `down` do, which is expected, as most `down` labels
 are at that fighter's usual height (the fixed standard catches those).
 By-eye check: 10 random drops in outputs/check/guard_drops_check.csv, next
 to the 20 punch detections.
+By-eye result (2026-10-28, sheet kept in labels/phase2/guard_drops_check.csv,
+each drop judged against that fighter's usual guard): **4 drop, 5 no_drop,
+1 other**.
+- Confirmed: D01, D02 (104715 fighter_1), D06, D07 (104715 fighter_2,
+  140-143 s).
+- Not a drop: D03; D04 and D05 (fighter_2, both hands over the same
+  129.3-129.7 s); D09, D10 (clinch_clip). Both hands "dropping" at once
+  hints at a body-level cause (a crouch, or a wrong torso length) rather
+  than the hands; it's about 1 s after the shared-track stretch (007). Not
+  checked yet.
+- Other: D08, the round is over and the fighter walks back to the corner.
+  The hand really is low, but it isn't sparring.
+- No drop was split into pieces, so gaps are not bridged.
+- Meaning: about 4 in 9 sparring drops are real (only 10 checked, so
+  rough). The drop count is usable as a rough number, but single drops
+  can't be shown as feedback yet.
+- Phase 3: label drops directly (start and end) and tune the margin (0.3)
+  and length (0.3 s) on them; look at drops on both hands at once (torso
+  length, tracking); leave out time between rounds (needs round times,
+  detected or entered by the user).
 
 ## 012 — Punch detection: several signals, record the camera angle
 Date: 2026-10-22
@@ -465,6 +485,35 @@ to the frame (mm:ss.mmm); 69 used.
   per window by balanced accuracy over-rewards the rare punch windows; a
   detector should be tuned on events (Phase 3). 5.2 / 0.11 is also what the
   by-eye sample was drawn from.
+By-eye result (2026-10-28, sheet kept in labels/phase2/punch_events_check.csv,
+20 random detections at 5.2 / 0.11): **11 punch, 8 guard, 1 other**, no
+feints or parries.
+- The false alarms are guard adjustments: the hand moving back up,
+  adjusting the guard, moving up and down (E01-E03, E06, E08,
+  E09, E13, E19). These are fast wrist movements near the head, which
+  wrist speed can't tell from a punch, and the arm reaches far enough to
+  pass the extension check. One `other`: E05, a lot of movement, no punch.
+- By hand: left 10 of 13 are punches, right 1 of 7. By fighter: 104715
+  fighter_2 0 of 3 (E08 a back view), 104715 fighter_1 4 of 8, clinch_clip
+  fighter_1 7 of 9.
+- Only 5 of the 11 real punches match a label in punch_labels.csv:
+  E17's label is a whole-second time (1:00.000), which the loader skips;
+  E12 is 0.14 s from a right-hand label in a back view but was detected on
+  the left (a left/right mix-up in the label or the keypoints); E04 is 0.7 s
+  after a right-hand label; E10, E15 and E20 have no label. So the labels
+  miss punches, and "26 false alarms per minute" overstates the problem:
+  about 9 in 20 detections (45%, roughly +/-20 points with 20 checked) are
+  not punches.
+- Meaning: with about 60% of labelled punches found and about 55% of
+  detections real, the punch total is in the right range, but by luck of two
+  errors offsetting; the per-punch events can't be shown as feedback yet,
+  and right-hand counts are unreliable.
+- Phase 3: (1) fix the labels first: add E10, E15, E20, re-time the
+  1:00.000 row, check E12's hand, and look for other missed punches;
+  (2) separate guard adjustments from punches: the wrist moving away from
+  the head and towards the opponent (needs the opponent's box), or a
+  stronger extension condition; (3) tune the detector on events, not
+  windows, with the right hand reported separately.
 
 ## 013 — Metrics go in their own file, with coverage on every number
 Date: 2026-10-28

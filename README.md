@@ -3,7 +3,8 @@
 Analyzes sparring footage of one selected fighter and gives offense/defense
 feedback, with progress tracking across sessions. Phase 1 is done: a
 command-line pipeline that tracks the chosen fighter, draws their skeleton and
-saves their keypoints. Now in Phase 2: turning those keypoints into metrics.
+saves their keypoints. Phase 2 is done too: guard and punch metrics from
+those keypoints. Now in Phase 3: measuring how accurate the metrics are.
 See [SPEC.md](SPEC.md) for the phases and [DECISIONS.md](DECISIONS.md) for why
 things are built the way they are.
 
@@ -75,8 +76,9 @@ writes **`fighter_1_metrics.json`** next to it (DECISIONS.md 011–013):
   below the fixed standard, -0.35), number of guard drops, and the height
   per minute.
 - **`punches`**: total, per hand, and per usable minute. The detector is
-  rough for now (Phase 3): it finds about 60% of punches and also fires on
-  other fast arm movements.
+  rough for now (Phase 3): it finds about 60% of punches, and in a by-eye
+  check about 9 in 20 detections were guard adjustments, not punches.
+  Guard drops are rough too: 4 of 9 checked were real.
 - **`events`**: punches and guard drops sorted by `time` in seconds.
 - Every average comes with **`coverage`**: how much trusted footage it rests
   on (0–1). `usable_minutes` and `frames` say the same for the whole clip.

@@ -1,0 +1,24 @@
+id,clip,time_s,frame,fighter,hand,what,notes
+E01,Recording 2026-09-24 104715,24.67,740,fighter_2,right,guard,
+E02,Recording 2026-09-24 104715,39.13,1174,fighter_1,left,guard,
+E03,Recording 2026-09-24 104715,45.93,1378,fighter_1,right,guard,adjusting his guard
+E04,Recording 2026-09-24 104715,88.03,2641,fighter_1,left,punch,
+E05,Recording 2026-09-24 104715,95.67,2870,fighter_1,left,other,a lot of movement no punch thrown
+E06,Recording 2026-09-24 104715,104.30,3129,fighter_2,right,guard,moving hand up and down
+E07,Recording 2026-09-24 104715,112.17,3365,fighter_1,left,punch,
+E08,Recording 2026-09-24 104715,121.30,3639,fighter_2,left,guard,bad angle from behind no punch thrown
+E09,Recording 2026-09-24 104715,124.50,3735,fighter_1,right,guard,moving his hand back up
+E10,Recording 2026-09-24 104715,125.33,3760,fighter_1,left,punch,
+E11,Recording 2026-09-24 104715,127.70,3831,fighter_1,right,punch,
+E12,clinch_clip,3.03,91,fighter_1,left,punch,
+E13,clinch_clip,4.07,122,fighter_1,right,guard,
+E14,clinch_clip,46.17,1385,fighter_1,left,punch,
+E15,clinch_clip,50.30,1509,fighter_1,left,punch,
+E16,clinch_clip,58.03,1741,fighter_1,left,punch,
+E17,clinch_clip,61.17,1835,fighter_1,left,punch,
+E18,clinch_clip,95.10,2853,fighter_1,left,punch,
+E19,clinch_clip,106.23,3187,fighter_1,right,guard,adjusting is hands up
+E20,clinch_clip,122.80,3684,fighter_1,left,punch,
+
+
+
