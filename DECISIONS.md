@@ -465,3 +465,30 @@ to the frame (mm:ss.mmm); 69 used.
   per window by balanced accuracy over-rewards the rare punch windows; a
   detector should be tuned on events (Phase 3). 5.2 / 0.11 is also what the
   by-eye sample was drawn from.
+
+## 013 — Metrics go in their own file, with coverage on every number
+Date: 2026-10-28
+Status: accepted.
+What: `python -m pipeline.summary fighter_N.json` writes
+`fighter_N_metrics.json` next to the keypoints file: a summary (guard per
+hand: average height, usual height, exposure below -0.35, drop count, height
+per minute; punch counts per hand and per usable minute; clinch count;
+the thresholds used) and every punch and guard-drop event sorted by time.
+Why a separate file: the keypoints JSON stays the raw record of the video.
+Metrics are recomputed in seconds from it whenever a threshold changes,
+without re-running the pose model, and the `settings` block says which
+thresholds produced a file.
+Choices (mine):
+- Each event gets a `time` to sort on: the peak for a punch, the start for a
+  guard drop.
+- Averages and exposure are weighted by frame weight and carry coverage
+  (DECISIONS 010); counts use trusted frames only (weight >= 0.5).
+- Height per minute is per clock minute of the video, so fatigue shows as
+  a trend; minutes with little trusted footage show low coverage.
+- Repeated pictures: the JSON's own per-frame `repeat` flags if present
+  (planned for the next re-run), else `--repeats`, else filter over frames;
+  `guard_filter` says which was used.
+- Frames where two fighters' files follow the same person are not left out
+  here (that's only an issue when two fighters are tracked in one clip).
+Known limit: punch counts inherit the detector's false alarms (012): on
+clinch_clip it reports 78 punches where 32 are labelled.

@@ -106,3 +106,5 @@
   - Punch labels re-timed to the frame. Window 0.6 s (-0.25/+0.35 around the label, from where the
     speed peak lands). Speed AUC 0.85; cross-clip gap 5.7 vs 4.4. Re-picked 4.5 / -0.03 would double
     false alarms at event level, so the detector keeps 5.2 / 0.11 (42/69 found, 26 false per minute).
+  - Metrics file: pipeline/summary.py writes fighter_N_metrics.json (guard per hand with coverage,
+    exposure, drops, per-minute trend; punch counts; time-sorted events). -> DECISIONS 013.

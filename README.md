@@ -62,6 +62,31 @@ weight:
 .venv\Scripts\python -m pipeline.metrics "outputs/analyze/clip/fighter_1.json" --frame 120
 ```
 
+## Metrics (Phase 2)
+
+```
+.venv\Scripts\python -m pipeline.summary "outputs/analyze/clip/fighter_1.json"
+```
+
+writes **`fighter_1_metrics.json`** next to it (DECISIONS.md 011–013):
+
+- **`guard`**, per hand: average guard height (torso lengths above the
+  shoulder line), the fighter's usual height, **exposure** (share of time
+  below the fixed standard, -0.35), number of guard drops, and the height
+  per minute.
+- **`punches`**: total, per hand, and per usable minute. The detector is
+  rough for now (Phase 3): it finds about 60% of punches and also fires on
+  other fast arm movements.
+- **`events`**: punches and guard drops sorted by `time` in seconds.
+- Every average comes with **`coverage`**: how much trusted footage it rests
+  on (0–1). `usable_minutes` and `frames` say the same for the whole clip.
+- `settings`: the thresholds used, so files made with different settings can
+  be told apart.
+
+Add `--repeats <list.json>` (per-frame true/false: same picture as the frame
+before) to smooth guard height over distinct pictures; the labelling kit
+saves one per clip in `outputs/labelling/cache/`.
+
 ## Tests
 
 ```
