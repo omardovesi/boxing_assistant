@@ -13,15 +13,17 @@ import argparse
 import csv
 import json
 import random
+import statistics
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 from pipeline import config
 from pipeline.body import HANDS, guard_height
+from pipeline.guard import detect_all as detect_guard_drops_all
 from pipeline.labelling_kit import CLIPS, OUT
 from pipeline.metrics import frame_weight, median_filter
-from pipeline.punches import detect_punches
+from pipeline.punches import detect_all as detect_all_punches, detect_punches
 from pipeline.signals import SIGNALS
 
 LABELS = Path("labels/phase2")
@@ -421,11 +423,59 @@ def events_report() -> None:
     print(f"\nWrote {len(sample)} events to {path} for the by-eye check")
 
 
+CHECK_DROPS = 10
+
+
+def drops_report() -> None:
+    """Guard drops per fighter, how they line up with the guard labels, and a
+    sample for the by-eye check (separate sheet from the punches)."""
+    guard_labels, _ = load_guard_labels(LABELS / "guard_labels.csv")
+    rows, inside = [], {"up": [0, 0], "down": [0, 0]}  # label -> [inside a drop, total]
+    for clip, fighters in CLIPS.items():
+        data = {name: json.loads(Path(p).read_text(encoding="utf-8")) for name, p in fighters.items()}
+        shared, repeats = shared_frames(data), repeats_for(clip)
+        for name, d in data.items():
+            frames, fps = d["frames"], d["fps"]
+            usable = [frame_weight(f) >= config.MIN_EVENT_WEIGHT and f["frame"] not in shared for f in frames]
+            punches = detect_all_punches(d, usable)
+            drops = detect_guard_drops_all(d, punches, usable, repeats)
+            minutes = sum(usable) / fps / 60
+            usual = {h: next((e["usual"] for e in drops if e["hand"] == h), None) for h in HANDS}
+            print(f"{_short(clip):<11} {name}: {len(drops)} guard drops ({len(drops) / minutes:.1f} per usable minute;"
+                  f" left {sum(e['hand'] == 'left' for e in drops)}, right {sum(e['hand'] == 'right' for e in drops)}),"
+                  f" usual guard left {usual['left']}, right {usual['right']},"
+                  f" median length {statistics.median([e['duration'] for e in drops]) if drops else 0:.2f} s")
+            rows += [{"clip": clip, "fighter": name, **e} for e in drops]
+            for lab in (l for l in guard_labels if (l.clip, l.fighter) == (clip, name)):
+                t = lab.frame / fps
+                hit = any(e["hand"] == lab.hand and e["start"] <= t < e["end"] for e in drops)
+                inside[lab.label][0] += hit
+                inside[lab.label][1] += 1
+    print(f"\nLabelled guard frames inside a detected drop: down {inside['down'][0]}/{inside['down'][1]},"
+          f" up {inside['up'][0]}/{inside['up'][1]}")
+    print("(A drop is judged against the fighter's own usual guard, the labels against a fixed standard,"
+          " so not every 'down' should be a drop.)")
+
+    rng = random.Random(0)
+    sample = sorted(rng.sample(rows, min(CHECK_DROPS, len(rows))), key=lambda r: (r["clip"], r["start"]))
+    CHECK.mkdir(parents=True, exist_ok=True)
+    path = CHECK / "guard_drops_check.csv"
+    if path.exists():
+        print(f"\n{path} already exists; not overwritten")
+        return
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["id", "clip", "start_s", "end_s", "fighter", "hand", "what", "notes"])
+        for k, r in enumerate(sample, 1):
+            w.writerow([f"D{k:02d}", r["clip"], f"{r['start']:.2f}", f"{r['end']:.2f}", r["fighter"], r["hand"], "", ""])
+    print(f"\nWrote {len(sample)} guard drops to {path} for the by-eye check")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("what", choices=["guard", "punch", "events"])
+    parser.add_argument("what", choices=["guard", "punch", "events", "drops"])
     args = parser.parse_args()
-    {"guard": guard_report, "punch": punch_report, "events": events_report}[args.what]()
+    {"guard": guard_report, "punch": punch_report, "events": events_report, "drops": drops_report}[args.what]()
 
 
 if __name__ == "__main__":

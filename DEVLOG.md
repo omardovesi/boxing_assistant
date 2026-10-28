@@ -100,3 +100,6 @@
   - Detector built (pipeline/punches.py). 49/68 found but 25 false alarms per usable minute; no
     threshold setting fixes it. 20 detections in outputs/check/ to classify by eye.
   - Face confidence separates back from front views (AUC 0.94).
+  - Guard-drop events (pipeline/guard.py): hand 0.3 below the fighter's own usual guard for 0.3 s,
+    not during/0.5 s after that hand's punches. 30 drops, 3-7 per minute; none on a labelled `up` hand.
+    10 sampled for the by-eye check (outputs/check/guard_drops_check.csv).

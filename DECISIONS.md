@@ -351,6 +351,27 @@ per-frame filter: over pictures it flattens a peak lasting one picture and
 lost 2 of 14 front-view punches.
 To do at the next re-run: export.py writes a per-frame `repeat` flag (with
 the opponent's box, 012), so the app doesn't need the labelling kit's cache.
+Guard-drop events (2026-10-28, pipeline/guard.py), the "against their own
+normal" half of this decision:
+- A drop = a hand at least 0.3 torso lengths below that fighter's usual
+  guard height for that hand (median over trusted frames) for 0.3 s or
+  more. 0.3 is about 3x the wrist jitter (my choice, not fitted).
+- Not during that hand's punches or the 0.5 s after each (the hand is still
+  coming back). Only the same hand's punches count: a rear hand dropping
+  while the lead hand jabs is exactly what a coach wants to see.
+- Only trusted frames (weight >= 0.5); a missing or untrusted frame ends a
+  drop. Guard height filtered over distinct pictures, as for the threshold.
+- Usual guard is the median over all trusted frames; punches aren't taken
+  out first (they're a few percent of frames, the median barely moves).
+- Each event: hand, start, end, duration, usual, lowest, below_usual.
+Result (`python -m pipeline.labels drops`): 30 drops in the two clips,
+3.4-7.1 per usable minute per fighter, median 0.4-0.6 s long. Usual guard
+ranges from -0.30 to -0.63, so fighters differ a lot (104715 fighter_1
+carries the left hand low). None of the 22 hands labelled `up` falls in a
+drop; 2 of 43 labelled `down` do, which is expected, as most `down` labels
+are at that fighter's usual height (the fixed standard catches those).
+By-eye check: 10 random drops in outputs/check/guard_drops_check.csv, next
+to the 20 punch detections.
 
 ## 012 — Punch detection: several signals, record the camera angle
 Date: 2026-10-22
