@@ -1,8 +1,6 @@
 # Boxing Coach AI
 
-
-https://github.com/user-attachments/assets/e47a36df-c6cb-48a6-a609-4bc7a4721054
-
+https://github.com/user-attachments/assets/1c39f65d-0a96-4978-87b8-43a6bbeffc5f
 
 Analyzes sparring footage of one selected fighter and gives offense/defense
 feedback, with progress tracking across sessions. Phase 1 is done: a
